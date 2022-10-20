@@ -1,0 +1,26 @@
+#!/bin/bash
+rm -rf build-ebaz
+# BASE might seem more appropriate, but not only does my tool not generate it:
+# Message: Failed to find matching architecture model for 'PLLE2_BASE'
+# There is an issue for this on f4pga-examples, but no progress in a year
+xc7-pll FCLKIN1=125 FCLKOUT0=25 CLKIN1name=fclk CLKOUT0name=clk25 >pll.v
+# -m is more accurate, but f4pga chokes:
+# Message: Failed to find matching architecture model for 'MMCME2_ADV_VPR'
+# even if I convert it to BASE (see above: BASE is not supported either way)
+# Message: Failed to find matching architecture model for 'MMCME2_BASE'
+xc7-pll modname=vidpll FCLKIN1=125 FCLKOUT1=371.25 FCLKOUT0=74.25 CLKIN1name=fclk CLKOUT0name=clk_pixel CLKOUT1name=clk_shift >vid-pll.v
+#xc7-pll modname=vidpll FCLKIN1=125 FCLKOUT1=126 FCLKOUT0=25.2 CLKIN1name=fclk CLKOUT0name=clk_pixel CLKOUT1name=clk_shift >vid-pll.v
+#ULX_DIR=../../ulx3s-misc/examples
+#LCD_DIR=${ULX_DIR}/spi_display/hdl/spi_display_verilog
+#DVI_DIR=${ULX_DIR}/dvi/hdl
+LCD_DIR=ulx3s-misc
+DVI_DIR=ulx3s-misc
+#UART_DIR=$HOME/fpga/j1c/verilog
+UART_DIR=j1c
+#LIB_DIR=${HOME}/fpga/lib
+LIB_DIR=..
+#fpgasynth -x -o ebaz -t top ebaz.v pll.v vid-pll.v \
+../mkebaz -t top ebaz.v ${LIB_DIR}/ebaz.xdc pll.v ebaz.sdc vid-pll.v \
+  ${LCD_DIR}/lcd_video.v \
+  ${DVI_DIR}/vga.v ${DVI_DIR}/vga2dvid.v ${DVI_DIR}/tmds_encoder.v \
+  ${UART_DIR}/uart.v

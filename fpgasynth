@@ -1,0 +1,538 @@
+#!/bin/bash
+# see below for why I made this bash instead of sh
+set -o posix
+
+# TODO:
+# - make at least 1 nexus binary (requires constraints on all pins)
+#   (I already did this once, but I need to verify it still works)
+# - maybe support f4pga (requires custom install system)
+# - support anlogic via prjtang (not yet usable) or Tang Dynasty (undocumented)
+# - support cyclone 5 (prjmistral) (about as bad as gowin/apicula)
+#
+# Things I won't do:
+#  - support machxo2 (too few LUTS, too rare/expensive to be of use)
+#  - support eoss3 (too few LUTs to be of use; probably needs f4pga)
+
+# this is bash-specific, and I don't know how to make it portable.
+addtrap() {
+  tno=${2:-0}
+  eval "ptrap=(`trap -p $tno`)"
+  ptrap="${ptrap[2]}"
+  test x- = "x$ptrap" && ptrap=
+  trap "$1${ptrap:+; $ptrap}" $tno
+}
+
+arch=()
+gwdev=()
+icedev=()
+ecp5dev=()
+nexusdev=()
+xdev=()
+pkg=()
+vhdl=
+vhdl_args=(--std=08 --ieee=synopsys)
+yargs=()
+schem=
+tr=
+top=
+delay=
+mk_tstrig=$HOME/fpga/lib/mk_testrig.sh
+doadd=
+keep=
+opref=
+sysv=
+defs=()
+
+addu() {
+  local arr e x g out="$1"
+  shift
+  eval "arr=(\"\${${out}[@]}\")"
+  for e; do
+    g=
+    for x in "${arr[@]}"; do
+      test "$x" = "$e" && g=y && break
+    done
+    test -z "$g" && arr=("${arr[@]}" "$e")
+  done
+  eval $out="(\"\${arr[@]}\")"
+}
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -a) addu arch ecp5 ice40 gowin ;;
+    -i) addu arch ice40 ;;
+    -I) addu arch ice40; shift; addu icedev "$1" ;;
+    -e) addu arch ecp5 ;;
+    -E) addu arch ecp5; shift; addu ecp5dev "$1" ;;
+    -n) addu arch nexus ;;
+    -N) addu arch nexus; shift; addu nexusdev "$1" ;;
+    -g) addu arch gowin ;;
+    -G) addu arch gowin; shift; addu gwdev "$1" ;;
+    -x) addu arch xilinx ;;
+    -X) addu arch xilinx; shift; addu xdev "$1" ;;
+    -t) shift; top="$1" ;;
+    -T) tr=y ;;
+    -d) delay=y ;;
+    -s) sysv=system ;;
+    -v) vhdl=y ;;
+    -V) vhdl=y; while :; do
+          shift
+          case "$1" in
+	    "") echo "Unterminated -V"; exit 1 ;;
+	    --) ;;
+            *)  vhdl_args=("${vhdl_args[@]}" "$1"); continue ;;
+	  esac
+	  break
+	done ;;
+    -D) shift; defs=("${defs[@]}" "$1") ;;
+    -D*)       defs=("${defs[@]}" "${1#-D}") ;;
+    -q) yargs=("${yargs[@]}" -q) ;;
+    -o) shift; opref="$1" ;;
+    -A) doadd=y ;;
+    -S) schem=y ;;
+    -k) keep=y ;;
+    -h|-*) cat <<EOF; exit 0 ;;
+Usage: $0 [flags] srcfile ...
+
+flags:
+  -q       Quieten yosys a bit
+  -o <prf> Prefix output files with given prefix
+           This excludes some side effects produced by ghdl and Gowin tools.
+  -D <def> Add parameter definition for reading Verilog
+  -v       All input files are VHDL instead of Verilog
+  -V .. -- Same as -v, but add .. to ghdl argument list
+  -s       All input files are System Verilog not supported w/o yosys plugin
+  -t <top> Set top module name (automatic otherwise)
+  -A       Enable adder extraction pass
+  -T       Enable use of automatic parallel-to-serial test rig
+  -R <scr> Enable generation of test rig with <scr>
+  -d       Enable generation of delay reports
+  -S       Enable generation of schematics from yosys/nextpnr
+  -a       Add all supported targets: ecp5 ice40 gowin
+  -g       Add gowin
+  -G <dev> Add gowin w/ given device
+  -i       Add ice40
+  -I <dev> Add ice40 w/ given device; append package with /pkg
+  -e       Add ecp5
+  -E <dev> Add ecp5 w/ given device; append package with /pkg
+  -n       Add nexus
+  -N <dev> Add nexus w/ given device
+  -k       Keep going on yosys errors
+  -h       Help
+Default ghdl/VHDL args are --std=08 --ieee=synopsys
+
+For ice40 and ecp5, use the nextpnr argument for the device.  If no -- is
+prepended, it is automatically added.  The only package supported for ecp5
+is CABGA381.
+
+If a gowin device doesn't start with G, it's assumed to be a number,
+optionally followed by a k or K.  This is converted into GW1NSR-LV4CQN48PC7/I6
+for 4 and GW1N-LV<n>QN48C6/I5 for any other number <n>.
+
+Default ice40 device is up5k.  Default package is sg48.
+Default ecp5 device is 85k 45k 25k.  Default package is CABGA381.
+Default gowin device is 9 4 1.
+Default nexus device is LIFCL-40-8SG72CES.
+Default xilinx device is xc7z010, package clg400, speed 1.
+EOF
+    *) break ;;
+  esac
+  shift
+done
+
+test $# -eq 0 && echo "No input files" && exit 1
+
+test -z "$arch" && arch=(gowin)
+test -z "$gwdev" && gwdev=(9 4 1)
+test -z "$icedev" && icedev=(up5k)
+test -z "$ecp5dev" && ecp5dev=(85k 45k 25k)
+test -z "$nexusdev" && nexusdev=(LIFCL-40-8SG72CES)
+test -z "$xdev" && xdev=(xc7z010)
+
+setdo() {
+  case "$d" in
+    *"#"*) do="${d#*\#}"; d="${d%%\#*}" ;;
+    *) do="$opref" ;;
+  esac
+}
+  
+
+if [ -z "$vhdl" ]; then
+  for x; do
+    case "$x" in *.vhd*) vhdl=y ;; esac
+  done
+fi
+
+test -n "$vhdl" && yargs=("${yargs[@]}" -m ghdl)
+test -n "$sysv" && yargs=("${yargs[@]}" -m systemverilog)
+defargs=("${defs[@]/#/-D}")
+yargs=("${yargs[@]}" "${defargs[@]}")
+
+docmd() {
+  local ofile=
+  case "$1" in
+    -o)  ofile="$2"; shift 2 ;;
+  esac
+  echo "******************************************************"
+  echo "**** $*${ofile:+ >$ofile}"
+  echo "******************************************************"
+  eval '"$@"' "${ofile:+>$ofile}"
+}
+
+test $# -eq 0 && exit 1
+
+if [ -n "$vhdl" ]; then
+ rm -f work-obj??.cf
+ docmd ghdl -i "${vhdl_args[@]}" "$@" || exit $?
+# docmd ghdl -a "${vhdl_args[@]}"  $(sed -n -e 's/^file \. "\([^"]*\)".*/\1/;T;p' work-obj??.cf | tac)
+ cmd="ghdl --latches ${vhdl_args[*]} $* -e $top"  # FIXME:  quote properly
+ top=
+else
+ # should I support -vlog95/-vlog2k/-sv?  maybe also other options, like -D?
+ # should I support pre-run verification w/ iverilog for better error msgs?
+ cmd="read_${sysv}verilog ${sysv:+${defargs[*]}} $*"  # FIXME:  quote properly
+fi
+do_yosys() {
+(
+  echo "$cmd"
+  if [ init = "$1" ]; then
+    if [ ${#arch[@]} = 1 ]; then
+      # it's very frustrating how different the synth_* routines are.
+      # gowin  proc+flatten before coarse by default
+      # ice40 proc always flatten by default before coarse
+      # ecp5 proc+flatten in coarse always
+      # nexus proc+flatten in coarse always
+      # xilinx proc before coarse (+ a ton of other crap), flatten only w/ -flatten
+      # I suppose adding proc; flatten here wouldn't hurt
+      echo "synth_${arch[0]} -run :coarse; proc; flatten;;;"
+    else
+      echo "prep -flatten ${top:+-top $top};;;"
+    fi
+    echo "write_json ${opref}raw.json"
+    if [ -n "$doadd" ]; then
+      echo "techmap; opt -full; extract_fa;;;"
+      echo write_json ${opref}fa.json
+    fi
+    exit 0
+  fi
+  echo "design -save raw"
+  for a in "${arch[@]}"; do
+    test -n "$pop" && echo $pop; pop="design -load raw"
+    case $a in
+      ice40) sopt=-dsp ;;
+      xilinx) sopt=-flatten ;;
+      *) sopt= ;;
+    esac
+    echo synth_$a ${sopt} ${top:+-top $top}
+    echo write_json ${opref}${a}.json 
+  done
+) | docmd yosys "${yargs[@]}" && return
+  test -n "$keep" || exit 1
+}
+for x in "${arch[@]}"; do
+  rm -f {pnr,}$x.{png,svg,json} $x.{bin,cfg,svf,asc,sdf}
+done
+do_yosys init
+test -n "$schem" && docmd json2png ${opref}raw
+
+# the default test rig bombs on extract_fa, so do it before adding the rig
+if [ -n "$doadd" ]; then
+  cmd="read_json alu.json"
+  docmd -o alu.json jq -f $HOME/fpga/lib/fa2add.jq fa.json
+fi
+
+# If the number of inputs/outputs is too large, reduce pin usage by
+# using a serial access method, implemented by ~/fpga/lib/testrig.v and the
+# mainline constructed below.
+# Uses jq to extract data from one of the synth outputs, assuming that the
+# synth outputs will all return the same set of inputs/outputs.
+
+# Extract top module from JSON
+topmod="$(jq -c < ${opref}raw.json '.modules|to_entries|
+   map(select(.value.attributes.top > 0))|.[]')"
+top="$(echo "$topmod" | jq -r .key)"
+echo "Top: $top"
+# Extract its port list
+ports="$(echo "$topmod" | jq -c '.value.ports|to_entries|
+   map(select(.value.direction=="input" or .value.direction=="output"))|
+   map({direction:.value.direction,name:.key,bits:(.value.bits|length)})')"
+# Count ports
+input=0; output=0
+eval $(echo "$ports" | jq -r 'group_by(.direction)|
+     map({direction:.[0].direction,bits:map(.bits)|add})|.[]|
+    .direction+"="+(.bits|tostring)')
+# Force use of test rig if # of ports is high, regardless of -T option
+test $((input+output)) -gt 40 && tr=y
+test -n "$tr" && . "$mk_tstrig"
+do_yosys
+for a in "${arch[@]}"; do
+  o=$opref$a
+  cmd=(nextpnr-$a --timing-allow-fail --json ${o}.json ${delay:+--sdf ${o}.sdf --report ${o}-report.json} --write ${o}-pnr.json --ignore-loops)
+  case "$a" in
+    gowin)
+      for d in "${gwdev[@]}"; do
+        setdo
+	od="$d"
+        case "$d" in
+	  9)                  d=GW1NR-LV9QN88PC6/I5 ;; # tang nano 9k
+	  4|GW1NSR-LV4CQN48)  d=GW1NSR-LV4CQN48PC7/I6 ;; # tang nano 4k
+	  G*QN?8)             d=${d}C6/I5 ;; # serveral devices have this speed
+	  [zZ]*)              d=GW1NZ-LV1QN48C6/I5 ;; # tang nano 1k
+	  [^G]*)              d=GW1N-LV${d%[kK]}QN48C6/I5 ;; # tang nano original
+	  *) ;;
+	esac
+        cst=
+	test -f "$do".cst && cst="$do.cst"
+	rd="${d%%??/*}"
+	for p in "" "$do"; do
+	  for f in $a{,-{"$od","$rd"}} "$rd"; do
+	    test -f "$p$f".cst && cst="$p$f".cst
+	  done
+	done
+        #######################
+	# Actually, forget apicula and its spinoffs.  It isn't ready for
+	# prime time.  Just use the Gowin toolset.  It's free.
+        # Missing primitives in apicula[/nextpnr-gowin/yosys' synth_gown]:
+	# [note: some of these may be not be real primitives on-device.
+	#  in particular, 36x36 mul isn't, and DL* might not be]
+	# MUX2_MUX{8,16,32} (but equivalent to MUX2_LUT{6,7,8})
+	# MUX{4,8,16,32} (but maybe yosys uses LUT combiners for same effect)
+	# LUT{5,6,7,8} (but yosys does synthesize equivalents)
+	# ALU has different ALU_MODE interpretation (string vs. #)
+	# various DFFs have different INIT interpretation (ignored anyway?)
+	# DL[N]{,C,P}[E] DL{C,P}EA (latches)
+	# Related to DFFs/Latches: Gowin says direct access, but apicula not
+	# IDDR{,C,_MEM} ODDR_MEM {OSER,IDES}{{4,8}{,_MEM},10,16} {I,O}VIDEO
+	#  (only ODDR[C])
+	# IODELAY{,A,B,C} IEM {,ELVDS_}I[O]BUF_R
+	# {E,T}LVDS_{I,O,T,IO}BUF (but maybe just {I,O,T}BUF w/ IOPORT?
+	# MIPI_[I][O]BUF MIPI_IBUF_{HS,LP} I3C_IOBUF
+	# ROM16 (but that's just an alias for LUT4)
+	# ROM{,X9} (but that's just SP{,X9} w/ write disabled)
+	# dsp: PADD{9,18} MULT{9X9,18X18,36X36} MULTALU{18,36}X18
+	#   MULTADDALU18X18 ALU54D
+	#   DSP56_{12X12{,SUM},27X{18,36}} (AT models?)
+	#   MULT{12X12,27X36} (definitely AT models)
+	# clock: PLL (obsolete anyway) PLL{VR,O,G} DLL{,DLY} CLKDIV{,2,G}
+	#   DHCEN[C] BUFG DCS DQCE OSC{O,W} DCCG
+	# DQS OTP SAMB (???)
+	# User Flash: FLASH{96K[A],256K,608K,128K,64K[Z]}
+	# [E]MCU USB20_PHY ADC SPMI I3C BANDGAP r{SDP,ROM}{,X9} MIPI_DPHY_RX
+	# AE350_SOC
+	# [S]DP{,X9}B pROM{,X9} (are these just aliases for [S]DP/ROM?)
+	# SPMI_DEBUG_GOWIN GW_JTAG (may not be on hw)
+	# GTR12_{PMAC,QUAD,UPAR}_DB MIPI_DPHY_RX_DB (debug: no hw?)
+	# I don't think there are primitives for the GW1NRF-4B SoC.
+	#
+	# In addition, missing support for on-chip "external" hardware:
+	# HyperRAM PSRAM NOR_Flash SDR/DDR_SDRAM (uses undocumented special
+	# port names for raw access, I guess, but indended to only be used
+	# with nasty encrypted ipcore modules)
+	#
+	# Also, only really supports about 6 devices at all.  Then again,
+	# the gowin toolkit doesn't seem to support some advertised devices,
+	# so they may not be available for purchase.  The GW2AN-X
+	# series are not even supported by gowin_unpack due to malformed
+	# (according to apicula) data.
+	if [ "${#defs[@]}" -gt 0 ]; then
+	  deffile=/tmp/def$$.v
+	  addtrap "rm -f $deffile"
+	  for x in "${defs[@]}"; do
+	    echo "\`define ${x%%=*} ${x#*=}"
+	  done >$deffile
+	else
+	  deffile=
+	fi
+	ob="${do##*/}"; ob="${ob%-}"
+	(
+	  echo "set_device -name [regsub {(^[^-]*-)[^0-9]*([0-9]*([BCDZ]|P5)?).*} {$d} {\1\2}]" "{$d}"
+	  test -n "$top" && echo "set_option -top_module {$top}"
+	  for x in gen_{sdf,text_timing_rpt} print_all_synthesis_warning \
+	           show_all_warn \
+		   use_{done,reconfign,jtag,mspi,sspi,i2c}_as_gpio; do
+	    echo "set_option -$x 1"
+	  done
+	  echo "set_option -cst_warn_to_error 0"
+	  test -n "$ob" && echo "set_option -output_base_name {$ob}"
+	  test -n "$sysv" && echo "set_option -verilog_std sysv2017"
+	  test -n "$vhdl" && echo "set_option -vhdl_std vhd2008"
+	  test -n "$deffile" && echo "add_file $deffile"
+	  for x; do
+	    case "$x" in
+	       */prim_syn.v|*/gowin_prim.v) ;;
+	       *) echo "add_file {$x}" ;;
+	     esac
+	  done
+	  test -n "$cst" && echo "add_file {$cst}"
+	  echo "run all"
+        ) >${do}gowin.tcl
+	ob="${ob:-project}"
+	#rm -rf impl
+	docmd $GOWINHOME/IDE/bin/gw_sh ${do}gowin.tcl
+	test -f impl/pnr/"$ob".fs || continue
+	find impl -type f -exec chmod -x {} \;
+	of="${cst%.cst}"; of="${of:-$a}"
+	of="${do}${of#$do}"
+	for x in fs bin rpt.txt; do
+	  /bin/mv -f impl/pnr/"$ob.$x" "$of.$x"
+	done
+	cat "$of".rpt.txt
+	continue
+        #######################
+	docmd "${cmd[@]}" --device "$d" ${cst:+--cst} ${cst} || break
+	of="${cst%.cst}"; of="${of:-$a}"
+	of="${do}${of#$do}"
+	# -c (compress) is currently broken:
+	# /bslib.py", line 96, in write_bitstream
+	#  [key8Z, key4Z, key2Z] = [i for i,val in enumerate(lst) if val==0][0:3]
+        #  ValueError: not enough values to unpack (expected 3, got 0)
+        docmd gowin_pack -d "$d" -o "$of".bin ${o}-pnr.json
+	# openFPGALoader ...
+      done
+      ;;
+    ice40)
+      for d in "${icedev[@]}"; do
+        setdo
+        case "$d" in
+	  */*) pkg="${d#*/}" ;;
+	  *)   pkg=sg48 ;;
+	esac
+	d="${d%%/*}"
+        case "$d" in
+	  --*) ;;
+	  *) d=--$d ;;
+	esac
+	pcf=
+	test -f "$do.pcf" && pcf="$do.pcf"
+	for p in "" "$do"; do
+	  for f in $a{,-{"$d#-"{,"$pkg"}}}; do
+	    test -f "$p$f".pcf && pcf="$p$f".pcf
+	  done
+	done
+	of="${pcf%.pcf}"; of="${of:-$a}"
+	of="${do}${of#$do}"
+	docmd "${cmd[@]}" --asc "${of}.asc" "$d" --package "$p" ${pcf:+--pcf "$pcf"} || break
+	docmd icepack "${of}.asc" "${of}.bin"
+      done
+      # openFPGALoader ...
+      ;;
+    ecp5)
+      for d in "${ecp5dev[@]}"; do
+        setdo
+        case "$d" in
+	  */*) pkg="${d#*/}" ;;
+	  *)   pkg=CABGA381 ;;
+	esac
+	d="${d%%/*}"
+        case "$d" in
+	  --*) ;;
+	  *) d=--$d ;;
+	esac
+	lpf=
+	test -f "$do.lpf" && lpf="$do.lpf"
+	for p in "" "$do"; do
+	  for f in $a{,-{"$d#-"{,"$pkg"}}}; do
+	    test -f "$p$f".lpf && lpf="$p$f".lpf
+	  done
+	done
+	of="${lpf%.lpf}"; of="${of:-$a}"
+	of="${do}${of#$do}"
+        docmd "${cmd[@]}" "--textcfg" "${of}.cfg" "$d" --package $pkg ${lpf:+--lpf "$lpf" --lpf-allow-unconstrained} || break
+        docmd ecppack --svf "${of}.svf" "${of}.cfg" "${o}.bin"
+      done
+      ;;
+    nexus)
+      for d in "${nexusdev[@]}"; do
+        setdo
+	pdc=
+	test -f "$do.pdc" && pdc="$do.pdc"
+	for p in "" "$do"; do
+	  for f in $a{,-"$d"} "$d"; do
+	    test -f "$p$f".pdc && pdc="$p$f".pdc
+	  done
+	done
+	of="${pdc%.pdc}"; of="${of:-$a}"
+	of="${do}${of#$do}"
+        docmd "${cmd[@]}" --device "$d" --asc "${of}.asc" ${pdc:+--pdc "$pdc"} || continue
+      done
+      ;;
+    xilinx)
+      for d in "${xdev[@]}"; do
+        setdo
+	case "$d" in
+	  *:*) db="${d#*:}"; d="${d%%:*}" ;;
+	  *)   db="$d" ;;
+        esac
+	db="${NEXTPNR_XILINX_DB:-/usr/local/prjxray}/$db"
+	test -f "$db" || db="${db}.bin"
+	if [ ! -f "$db" ]; then
+	  bdb="${db##*/}"
+	  bdb="${bdb%.bin}"
+	  cat <<EOF
+${db%.bin}{,.bin} not found.
+You can override the path with NEXTPNR_XILINX_DB.
+You can override the db file name by adding :<dbname> to the dev name $d.
+You can generate the database from nextpnr-xilinx after building:
+	python3 xilinx/python/bbaexport.py --device $d --bba ${bdb}.bba
+	[build/]bbasm --l ${bdb}.{bba,bin}
+EOF
+	  exit 1
+	fi
+        case "$d" in
+	  */*) pkg="${d#*/}"; pkg="${pkg%%-*}" ;;
+	  *)   pkg=clg400 ;;
+	esac
+	case "$d" in
+	  *-*) spd="${d#*-}" ;;
+	  *)   spd=1 ;;
+	esac
+	d="${d%%[/-]*}$pkg${spd:+-}$spd"
+	rd="$d"
+	# Maybe if I get another Xilinx board, I'll tighten up the
+	# device name parsing.  I only care about xc7z010 right now.
+	case "$d" in
+	  zynq7*) fam=zynq7; rd="xc7z${rd#zynq7}" ;;
+	  xc7z*) fam=zynq7 ;;
+	  artix7*) fam=zynq7; rd="xc7a${rd#zynq7}" ;;
+	  xc7a*) fam=artix7 ;;
+	  spartan7*) fam=zynq7; rd="xc7s${rd#zynq7}" ;;
+	  xc7s*) fam=spartan7 ;;
+	  *) echo "Unsupported device $x"; exit 1 ;;
+	esac
+	xdc=
+	test -f "$do.xdc" && xdc="$do.xdc"
+	for p in "" "$do"; do
+	  for f in $a{,-{"$d#-"{,"$pkg"}}}; do
+	    test -f "$p$f".xdc && xdc="$p$f".xdc
+	  done
+	done
+	dbd="${PRJXRAY_DB:-/usr/local/prjxray/prjxray-db}/$fam"
+	if [ ! -d "$dbd" ]; then
+	  echo "Can't find $dbd.  You can clone from https://github.com/SymbiFlow/prjxray-db"
+	  exit 1
+	fi
+	if [ ! -d "$dbd/$rd" ]; then
+	  echo "Can't find $rd in $dbd.  Invalid device name?"
+	  exit 1
+	fi
+	# no install target for the Python crap.  Expected to use pip, as usual
+	f2f=fasm2frames.py
+	type "$f2f" >/dev/null 2>&1 || f2f="${PRJXRAY_UTILS:-/usr/local/prjxray/utils}"/$f2f
+	# xc7frames2bit should be installed to /usr/local/bin
+	f2b=xc7frames2bit
+	type "$f2b" >/dev/null 2>&1 || f2b="${PRJXRAY_UTILS:-/usr/local/prjxray/utils}"/../tools/$f2b
+	if ! type "$f2f" >/dev/null 2>&1 && ! type "$f2b" >/dev/null 2>&1; then
+	  echo "Can't find prjxray utils; set PRJXRAY_UTILS."
+	  exit 1
+	fi
+	of="${xdc%.xdc}"; of="${of:-$a}"
+	of="${do}${of#$do}"
+        docmd "${cmd[@]}" --fasm "${of}.fasm" --chipdb "$db" ${xdc:+--xdc "$xdc"} || break
+	docmd "$f2f" --db-root "$dbd" --part $rd "${of}.fasm">"${of}.frames"
+	docmd "$f2b" --part_file "$dbd/$rd/part.yaml" --part_name "${d%-*}" \
+	             --frm_file "${of}.frames" --output_file "${of}.bin"
+      done
+      ;;
+  esac
+  test -f ${o}-pnr.json -a -n "$schem" && docmd json2png ${o}-pnr || :
+done
