@@ -6,7 +6,8 @@ publicly related to the EBAZ4205 bitmining control board, which I use
 as a Zynq 7010 FPGA development platform.  Keep in mind that before I
 had a stupid idea to do something on an FPGA mid-March 2022, I
 didn't know jack about FPGAs or anything related to them, other than a
-vague awareness of their existence.
+vague awareness of their existence.  It's been more than 30 years
+since I was an electronics hobbyist on my aborted EE path.
 
 This repository may disappear at any time, since it is only a
 subproject of a larger FPGA-related project, and I might merge it with
@@ -174,3 +175,9 @@ there, `MMCME2_ADV` is producing incorrect results.
 Unfotunately, even though `nextpnr-xilinx` is much faster and produces
 better reports, it has many more missing primitives (maybe because I
 built it incorrectly, but it's hard for me to tell either way).
+
+As with all of my software in the past few years, everything in this
+repository is in the Public Domain, except as noted for specific files
+(i.e., files I've borrowed from other projects).   If you find I've
+violated anybody else's licences with this inclusion, let me know and
+I'll remove it, and avoid it at all costs in the future.
