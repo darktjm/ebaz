@@ -148,7 +148,7 @@ int main(int argc, const char **argv)
 		"Usage: %s [flag|parm=val] ...\n"
 		"Flags:\n"
 		"\t--help|-h|help: Print this message\n"
-		"\t-s <n>: Set speed grade for limit defaults (1-3; default 1))\n"
+		"\t-s <n>: Set speed grade for limit defaults (1-3; default 1)\n"
 		"\t-m: Use of MMCME2 instead of PLLE2\n"
 		"\t    This gives you fractional OUT0/OUTFB dividers, OUT6, inverted outputs\n"
 		"\t    Also, allows higher dividers on OUT4 via OUT6\n"
@@ -257,7 +257,7 @@ int main(int argc, const char **argv)
 	    double fvco = FCLKIN1 * fbdiv / idiv;
 	    if(use_mmcm)
 		fvco /= 8;
-	    double ferr = 0;
+	    double ferr = -1;
 	    int fdiv[7] = {};
 	    for(int c = 0; c < 7; c++) {
 		int adj = c || !use_mmcm ? 1 : 8;
@@ -267,10 +267,10 @@ int main(int argc, const char **argv)
 		    if(tdiv <= 128 * adj) {
 			if(tdiv < 128 * adj)
 			    terr2 = fabs(FCLKOUT[c] - fvco / (tdiv + 1) * adj);
-			else terr2 = FCLKOUT[c];
+			else terr2 = 10000;
 			if(tdiv)
 			    terr = fabs(FCLKOUT[c] - fvco / tdiv * adj);
-			else terr = FCLKOUT[c];
+			else terr = 10000;
 			if(terr2 < terr) {
 			    terr = terr2;
 			    fdiv[c] = tdiv + 1;
@@ -282,7 +282,7 @@ int main(int argc, const char **argv)
 			continue;
 		}
 	    }
-	    if(ferr <= minerr) {
+	    if(ferr >= 0 && ferr <= minerr) {
 		minerr = ferr;
 		CLKIN_DIV = idiv;
 		CLKFB_DIV = fbdiv;
