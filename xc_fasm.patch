@@ -1,0 +1,19 @@
+--- conda/envs/xc7/lib/python3.7/site-packages/xc_fasm/xc_fasm.py	2022-12-01 23:50:51.044693287 -0500
++++ conda/envs/xc7/lib/python3.7/site-packages/xc_fasm/xc_fasm.py	2022-09-17 04:52:16.000000000 -0400
+@@ -21,6 +21,7 @@
+ import subprocess
+ import os
+ import tempfile
++import re
+ 
+ from prjxray import util
+ from .fasm2frames import fasm2frames
+@@ -73,7 +74,7 @@
+ 
+     result = subprocess.check_output(
+         "{} --frm_file {} --output_file {} --part_name {} --part_file {}".
+-        format(args.frm2bit, frm_out, args.bit_out, args.part, args.part_file),
++        format(args.frm2bit, frm_out, args.bit_out, re.sub("-.$","",args.part), args.part_file),
+         shell=True)
+ 
+ 

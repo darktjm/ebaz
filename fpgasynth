@@ -6,14 +6,27 @@ set -o posix
 # - make at least 1 nexus binary (requires constraints on all pins)
 #   (I already did this once, but I need to verify it still works)
 # - maybe support f4pga (requires custom install system)
+# - support parallel compile w/ gowin (i.e. non-shared impl dir)
 # - support anlogic via prjtang (not yet usable) or Tang Dynasty (undocumented)
 # - support cyclone 5 (prjmistral) (about as bad as gowin/apicula)
+# - document just how broken nextpnr-xilinx really is
+# - support xilinx via f4pga (still broken, though, e.g. no k325t, no MMCM)
+# - support xilinx via Vivado (still won't support k325t, though)
+# - support iverilog as target
+# - get rid of .bin as default ext. openFPGALoader doesn't like it.
+# - support partial execution/convert to makefile(-like)
+# - document known issues w/ yosys (e.g. no tdp RAM w/ shared clock, occasional
+#   assertion crashes, no BSRAM with Gowin's recommended generic Verilog)
+# - separate README
 #
 # Things I won't do:
 #  - support machxo2 (too few LUTS, too rare/expensive to be of use)
 #  - support eoss3 (too few LUTs to be of use; probably needs f4pga)
 
 # this is bash-specific, and I don't know how to make it portable.
+#  zsh doesn't work in subshell or pipe
+#  dash is garbage, so I haven't done any testing or research
+#  I don't have ksh installed
 addtrap() {
   tno=${2:-0}
   eval "ptrap=(`trap -p $tno`)"
@@ -41,6 +54,7 @@ doadd=
 keep=
 opref=
 sysv=
+ysysv=
 defs=()
 
 addu() {
@@ -74,6 +88,7 @@ while [ $# -gt 0 ]; do
     -T) tr=y ;;
     -d) delay=y ;;
     -s) sysv=system ;;
+    -sv) ysysv=-sv ;;
     -v) vhdl=y ;;
     -V) vhdl=y; while :; do
           shift
@@ -102,6 +117,7 @@ flags:
   -v       All input files are VHDL instead of Verilog
   -V .. -- Same as -v, but add .. to ghdl argument list
   -s       All input files are System Verilog not supported w/o yosys plugin
+  -sv      All input files are System Verilog supported by yosys\' -sv
   -t <top> Set top module name (automatic otherwise)
   -A       Enable adder extraction pass
   -T       Enable use of automatic parallel-to-serial test rig
@@ -127,11 +143,12 @@ is CABGA381.
 
 If a gowin device doesn't start with G, it's assumed to be a number,
 optionally followed by a k or K.  This is converted into GW1NSR-LV4CQN48PC7/I6
-for 4 and GW1N-LV<n>QN48C6/I5 for any other number <n>.
+for 4 and GW1N-LV<n>QN48C6/I5 for any other number <n>.  For p and GW2A, it
+is GW2A-LV18PG256C8/I7.
 
 Default ice40 device is up5k.  Default package is sg48.
 Default ecp5 device is 85k 45k 25k.  Default package is CABGA381.
-Default gowin device is 9 4 1.
+Default gowin device is p 9 4 1.
 Default nexus device is LIFCL-40-8SG72CES.
 Default xilinx device is xc7z010, package clg400, speed 1.
 EOF
@@ -143,7 +160,7 @@ done
 test $# -eq 0 && echo "No input files" && exit 1
 
 test -z "$arch" && arch=(gowin)
-test -z "$gwdev" && gwdev=(9 4 1)
+test -z "$gwdev" && gwdev=(p 9 4 1)
 test -z "$icedev" && icedev=(up5k)
 test -z "$ecp5dev" && ecp5dev=(85k 45k 25k)
 test -z "$nexusdev" && nexusdev=(LIFCL-40-8SG72CES)
@@ -190,7 +207,7 @@ if [ -n "$vhdl" ]; then
 else
  # should I support -vlog95/-vlog2k/-sv?  maybe also other options, like -D?
  # should I support pre-run verification w/ iverilog for better error msgs?
- cmd="read_${sysv}verilog ${sysv:+${defargs[*]}} $*"  # FIXME:  quote properly
+ cmd="read_${sysv}verilog ${ysysv} ${sysv:+${defargs[*]}} $*"  # FIXME:  quote properly
 fi
 do_yosys() {
 (
@@ -204,7 +221,7 @@ do_yosys() {
       # nexus proc+flatten in coarse always
       # xilinx proc before coarse (+ a ton of other crap), flatten only w/ -flatten
       # I suppose adding proc; flatten here wouldn't hurt
-      echo "synth_${arch[0]} -run :coarse; proc; flatten;;;"
+      echo "synth_${arch[0]} -run :coarse; proc; flatten; proc;;;"
     else
       echo "prep -flatten ${top:+-top $top};;;"
     fi
@@ -220,7 +237,7 @@ do_yosys() {
     test -n "$pop" && echo $pop; pop="design -load raw"
     case $a in
       ice40) sopt=-dsp ;;
-      xilinx) sopt=-flatten ;;
+      xilinx) sopt=-flatten\ -abc9 ;;
       *) sopt= ;;
     esac
     echo synth_$a ${sopt} ${top:+-top $top}
@@ -262,7 +279,8 @@ eval $(echo "$ports" | jq -r 'group_by(.direction)|
      map({direction:.[0].direction,bits:map(.bits)|add})|.[]|
     .direction+"="+(.bits|tostring)')
 # Force use of test rig if # of ports is high, regardless of -T option
-test $((input+output)) -gt 40 && tr=y
+# Then again, Tang Primer has a BG256 package w/ very few unused pins
+# test $((input+output)) -gt 30 && tr=y
 test -n "$tr" && . "$mk_tstrig"
 do_yosys
 for a in "${arch[@]}"; do
@@ -278,6 +296,7 @@ for a in "${arch[@]}"; do
 	  4|GW1NSR-LV4CQN48)  d=GW1NSR-LV4CQN48PC7/I6 ;; # tang nano 4k
 	  G*QN?8)             d=${d}C6/I5 ;; # serveral devices have this speed
 	  [zZ]*)              d=GW1NZ-LV1QN48C6/I5 ;; # tang nano 1k
+	  GW2A|[pP]*)         d=GW2A-LV18PG256C8/I7 ;; # Tang Primer 20K
 	  [^G]*)              d=GW1N-LV${d%[kK]}QN48C6/I5 ;; # tang nano original
 	  *) ;;
 	esac
@@ -348,13 +367,15 @@ for a in "${arch[@]}"; do
 	  echo "set_device -name [regsub {(^[^-]*-)[^0-9]*([0-9]*([BCDZ]|P5)?).*} {$d} {\1\2}]" "{$d}"
 	  test -n "$top" && echo "set_option -top_module {$top}"
 	  for x in gen_{sdf,text_timing_rpt} print_all_synthesis_warning \
-	           show_all_warn \
-		   use_{done,reconfign,jtag,mspi,sspi,i2c}_as_gpio; do
+		   use_{done,ready,mspi,sspi,i2c,reconfign}_as_gpio \
+	           show_all_warn bit_compress bit_incl_bsram_init hotboot; do
+#		   use_{reconfign,jtag}_as_gpio \
 	    echo "set_option -$x 1"
 	  done
+	  echo "set_option -bit_security 0"
 	  echo "set_option -cst_warn_to_error 0"
 	  test -n "$ob" && echo "set_option -output_base_name {$ob}"
-	  test -n "$sysv" && echo "set_option -verilog_std sysv2017"
+	  test -n "$sysv$ysysv" && echo "set_option -verilog_std sysv2017"
 	  test -n "$vhdl" && echo "set_option -vhdl_std vhd2008"
 	  test -n "$deffile" && echo "add_file $deffile"
 	  for x; do
@@ -368,12 +389,13 @@ for a in "${arch[@]}"; do
         ) >${do}gowin.tcl
 	ob="${ob:-project}"
 	#rm -rf impl
-	docmd $GOWINHOME/IDE/bin/gw_sh ${do}gowin.tcl
+	docmd $GOWINHOME/IDE/bin/gw_sh ${do}gowin.tcl | \
+	  sed -E 's/^((ERROR|WARN|NOTE)[^:]*: )(.*)\("([^"]*)"(:[0-9]*)\)$/\4\5:\1\3/'
 	test -f impl/pnr/"$ob".fs || continue
 	find impl -type f -exec chmod -x {} \;
 	of="${cst%.cst}"; of="${of:-$a}"
 	of="${do}${of#$do}"
-	for x in fs bin rpt.txt; do
+	for x in fs rpt.txt; do
 	  /bin/mv -f impl/pnr/"$ob.$x" "$of.$x"
 	done
 	cat "$of".rpt.txt
@@ -460,9 +482,14 @@ for a in "${arch[@]}"; do
       for d in "${xdev[@]}"; do
         setdo
 	case "$d" in
+	  z) d=xc7z010 ;;
+	  k) d=xc7k325t/ffg676-1 ;;
+	esac
+	case "$d" in
 	  *:*) db="${d#*:}"; d="${d%%:*}" ;;
 	  *)   db="$d" ;;
         esac
+	db="${db%%[/-]*}"
 	db="${NEXTPNR_XILINX_DB:-/usr/local/prjxray}/$db"
 	test -f "$db" || db="${db}.bin"
 	if [ ! -f "$db" ]; then
@@ -497,6 +524,8 @@ EOF
 	  xc7a*) fam=artix7 ;;
 	  spartan7*) fam=zynq7; rd="xc7s${rd#zynq7}" ;;
 	  xc7s*) fam=spartan7 ;;
+	  kintex7*) fam=kintex7; rd="xc7k${rd#kintex7}" ;;
+	  xc7k*) fam=kintex7 ;;
 	  *) echo "Unsupported device $x"; exit 1 ;;
 	esac
 	xdc=

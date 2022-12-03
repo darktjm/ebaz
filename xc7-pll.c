@@ -18,6 +18,7 @@
  *          static: Just use defparam <modname>.pll <val>
  *          dynamic: PHASE{SEL{0,1},DIR,STEP,LOADREG}
  *        Maybe support some sort of external CLKFB arrangement
+ *        Option to insert BUFG (or BUFR?)
  *        Option to spit out the results in machine-readable form instead of .v */
 
 #include <stdio.h>

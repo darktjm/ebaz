@@ -25,7 +25,8 @@ Other files of note:
     resources.  Naturally, to use this, you will either need to
     ensure constraint errors are just warnings, or hand-edit it
     for every project.  I don't like hand-editing stuff that
-    should be "standard", so I choose the former option.
+    should be "standard", so I choose the former option.  This
+    requires patching f4pga (optcstr.patch).  Good luck.
 
     Note that this does not include timing constraints.
 
@@ -50,20 +51,6 @@ Other files of note:
     For example, to build the ethernet example into `build-ebaz/ebaz.bit`
     (derived from the xdc name):
 >     mkebaz -t top eth.v pll.v ebaz.xdc
-
-    Note that currently, among other things, f4pga does not
-    support MMCM on the Zynq 7010.  Or, for that mattter, BUFR.
-    Who knows what else isn't supported?  I didn't make a
-    comprehensive list yet, like I did for Gowin.  At least it
-    supports the all-important PS7, without which there would be
-    no clocks.
-
-    Also, I patched the f4pga scripts some.  I will upload patches
-    once I generate them.  Figuring out what I changed with this
-    conda install is very difficult and annoying.  One important
-    patch, probably the most important, is that I fixed it to use
-    a shorter device name in the binary image.  The default kernel
-    on the ebaz barfs if it's more than 16 characters.
 
   - `fpgasynth` - this is my generic wrapper program around the
     yosys+nextpnr toolchain.  It really only works for Lattice
@@ -163,18 +150,76 @@ bootgen to generate a full binary for flashing or SD card generation,
 because I had trouble finding fsbl.  I should be able to use the one
 from Vivado now that I've finally given in and installed it.
 
-Some bugs have been unaddressed for years now.  Will the free
-toolchain ever actually be ready for prime time?  I don't really care
-for `vpr` as packaged by `f4pga`, either, given that its reports are
-useless and it takes forever (likely due to
+My grumbling; feel free to ignore
+---------------------------------
+
+Some bugs in the free tools have been unaddressed for years now.  Will
+the free toolchain ever actually be ready for prime time?  I don't
+really care for `vpr` as packaged by `f4pga`, either, given that its
+reports are useless and it takes forever (likely due to
 <https://github.com/f4pga/f4pga-arch-defs/issues/1863>, mostly).  No
 `MMCME2_ADV` or `BUFR` or `PLLE2_BASE` or `MMCME2_BASE` and who knows
-how many other missing primitives.  Plus apparently even if it were
-there, `MMCME2_ADV` is producing incorrect results.
+how many other missing primitives (it's not worth my time to make a
+comprehensie list, like I did for Gowin parts).  Plus apparently even
+if it were there, `MMCME2_ADV` is producing incorrect results.  At
+least it supports the all-important PS7 primitive, without which there
+would be no clocks (or ethernet passthrough, which makes programming
+easier).
 
 Unfotunately, even though `nextpnr-xilinx` is much faster and produces
 better reports, it has many more missing primitives (maybe because I
-built it incorrectly, but it's hard for me to tell either way).
+built it incorrectly, but it's hard for me to tell either way). I do
+not see f4pga going anywhere I want to follow, so if I do put effort
+into making a free tool work better, it will be nextpnr-xilinx.
+Significantly less than 60k/3G files, and at least far less Python
+(seems impossible to get away from it entirely without rewriting
+everything from scratch).
+
+Given my frustration with how f4pga is structured and the lack of
+support for important things (no devices other than what the free
+version of Vivado supports, anyway, but with fewer components, longer
+compile times, and just as little control over what happens since
+managing 60k/3G installed files is bullshit), I will likely never use
+f4pga again.  The only development that might change my mind is
+xc7k325t support, which likely won't happen.  The only artifact I have
+preserved from my previous use of f4pga is a small patch to reduce the
+embedded device name in the binary so the ebaz default kernel will
+load it (xc_fasm.patch).  I already mentioned my optional constraints
+patch above.  I recall spending a lot of time in the install dir, so I
+probably made other changes as well, but I don't remember and I don't
+care any more.  I've now chucked them all in favor of a fresh install.
+
+"F4PGA: The GCC of FPGAs".  Right.  Not only is it not a standalone
+project (all components except for the crappy Python glue code come
+from elsewhere), but it's extremely poorly documented (an example can
+supplement, but not replace actual documentation) with frequent
+changes and no view whatsoever towards backwards compatibility.  Ever
+hear the expression "Bugs are just undocumented features"?  Works both
+ways.  All undocumented features are bugs.  Learn to write
+documentation before you churn out code.  Pretty much what I expect of
+modern open source projects, rather than the standard GCC was based
+on.  I certainly hope it doesn't become the (only) standard open
+source toolkit for FPGAs.  Or if it does, it becomes better somehow (I
+doubt it will drop Python or its completely broken dependency
+management systems any time soon, though).
+
+Once again, like with the Gowin parts, I have been fooled into
+thinking things were ready, when they weren't.  At least with Gowin I
+got a mstly hassle-free full prorprietary Linux toolchain free of
+charge; AMD/Xilinx makes no similar offers.  Their proprietary
+toolchain has more hassle (less usable documentation, for one) and
+only supports a subset of devices (e.g. no Kintex parts at all, even
+though Kintex dev boards are now pretty cheap comparitively).
+
+I might abandon the Xilinx FPGA line in general anyway, since it's
+steeped in the same bullshit that contributed to my abandonment of the
+electronics hobby years ago, such as requiring essentially a club
+membership fee in order to use components (lack of documentation
+combined with no free-of-charge usable tools to partially compensate,
+except for "selected" components, such as no Kintex suppoprt at all).
+
+License Information
+-------------------
 
 As with all of my software in the past few years, everything in this
 repository is in the Public Domain, except as noted for specific files
