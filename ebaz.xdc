@@ -195,33 +195,38 @@ set_property IOSTANDARD LVCMOS33 [get_ports BEEP]  # 35 DATA1_14 IO_L3N
 # HDMI port
 # SDA, SCL, CEC not attached
 # I wonder if I could wire LCD_SCL/LCD_SDA to SDA/SCL.
-set_property LOC F19 [get_ports TMDI_CK_P]     # 35 DATA1_19 IO_L15P
-set_property LOC F20 [get_ports TMDI_CK_N]     # 35 DATA1_17 IO_L15N
-set_property LOC D19 [get_ports TMDI_TX_P[0]]  # 35 DATA1_16 IO_L4P
-set_property LOC D20 [get_ports TMDI_TX_N[0]]  # 35 DATA1_13 IO_L4N
-set_property LOC C20 [get_ports TMDI_TX_P[1]]  # 35 DATA1_9  IO_L1P
-set_property LOC B20 [get_ports TMDI_TX_N[1]]  # 35 DATA1_8  IO_L1N
-set_property LOC B19 [get_ports TMDI_TX_P[2]]  # 35 DATA1_7  IO_L2P
-set_property LOC A20 [get_ports TMDI_TX_N[2]]  # 35 DATA1_5  IO_L2N
+set_property LOC F19 [get_ports HDMI_CK_P]     # 35 DATA1_19 IO_L15P
+set_property LOC F20 [get_ports HDMI_CK_N]     # 35 DATA1_17 IO_L15N
+set_property LOC D19 [get_ports HDMI_TX_P[0]]  # 35 DATA1_16 IO_L4P
+set_property LOC D20 [get_ports HDMI_TX_N[0]]  # 35 DATA1_13 IO_L4N
+set_property LOC C20 [get_ports HDMI_TX_P[1]]  # 35 DATA1_9  IO_L1P
+set_property LOC B20 [get_ports HDMI_TX_N[1]]  # 35 DATA1_8  IO_L1N
+set_property LOC B19 [get_ports HDMI_TX_P[2]]  # 35 DATA1_7  IO_L2P
+set_property LOC A20 [get_ports HDMI_TX_N[2]]  # 35 DATA1_5  IO_L2N
+# Repeat of clk for easier array usage
+set_property LOC F19 [get_ports HDMI_TX_P[3]]     # 35 DATA1_19 IO_L15P
+set_property LOC F20 [get_ports HDMI_TX_N[3]]     # 35 DATA1_17 IO_L15N
 
-set_property IOSTANDARD TMDS_33 [get_ports TMDI_CK_P]
-set_property IOSTANDARD TMDS_33 [get_ports TMDI_CK_N]
-set_property IOSTANDARD TMDS_33 [get_ports TMDI_TX_P[0]]
-set_property IOSTANDARD TMDS_33 [get_ports TMDI_TX_N[0]]
-set_property IOSTANDARD TMDS_33 [get_ports TMDI_TX_P[1]]
-set_property IOSTANDARD TMDS_33 [get_ports TMDI_TX_N[1]]
-set_property IOSTANDARD TMDS_33 [get_ports TMDI_TX_P[2]]
-set_property IOSTANDARD TMDS_33 [get_ports TMDI_TX_N[2]]
+set_property IOSTANDARD TMDS_33 [get_ports HDMI_CK_P]
+set_property IOSTANDARD TMDS_33 [get_ports HDMI_CK_N]
+set_property IOSTANDARD TMDS_33 [get_ports HDMI_TX_P[0]]
+set_property IOSTANDARD TMDS_33 [get_ports HDMI_TX_N[0]]
+set_property IOSTANDARD TMDS_33 [get_ports HDMI_TX_P[1]]
+set_property IOSTANDARD TMDS_33 [get_ports HDMI_TX_N[1]]
+set_property IOSTANDARD TMDS_33 [get_ports HDMI_TX_P[2]]
+set_property IOSTANDARD TMDS_33 [get_ports HDMI_TX_N[2]]
+set_property IOSTANDARD TMDS_33 [get_ports HDMI_TX_P[3]]
+set_property IOSTANDARD TMDS_33 [get_ports HDMI_TX_N[3]]
 
 # SLEW FAST not supported by TMDS_33, apparently
-#set_property SLEW FAST [get_ports TMDI_CK_P]
-#set_property SLEW FAST [get_ports TMDI_CK_N]
-#set_property SLEW FAST [get_ports TMDI_TX_P[0]]
-#set_property SLEW FAST [get_ports TMDI_TX_N[0]]
-#set_property SLEW FAST [get_ports TMDI_TX_P[1]]
-#set_property SLEW FAST [get_ports TMDI_TX_N[1]]
-#set_property SLEW FAST [get_ports TMDI_TX_P[2]]
-#set_property SLEW FAST [get_ports TMDI_TX_N[2]]
+#set_property SLEW FAST [get_ports HDMI_CK_P]
+#set_property SLEW FAST [get_ports HDMI_CK_N]
+#set_property SLEW FAST [get_ports HDMI_TX_P[0]]
+#set_property SLEW FAST [get_ports HDMI_TX_N[0]]
+#set_property SLEW FAST [get_ports HDMI_TX_P[1]]
+#set_property SLEW FAST [get_ports HDMI_TX_N[1]]
+#set_property SLEW FAST [get_ports HDMI_TX_P[2]]
+#set_property SLEW FAST [get_ports HDMI_TX_N[2]]
 
 # .100 header
 # H4_01 3.3V

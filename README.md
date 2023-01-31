@@ -106,8 +106,7 @@ Other files of note:
   - `demo` - against my better judgement, I have included my
     simple demo which exercises the components I want: LEDs,
     pushbuttons, speaker, LCD, USB UART (echos @115200), ethernet
-    passthrough, and HDMI.  Currently, HDMI doesn't work, and I
-    have no idea why.  There also seems to be an issue with the
+    passthrough, and HDMI.  There seems to be an issue with the
     LCD backlight, even though another demo I have (the ulx3s-misc
     collatz example ported to the ebaz) seems to work, at least in
     that regard.  Parts were taken from other projects which were

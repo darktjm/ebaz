@@ -33,8 +33,7 @@ module top(
 `endif
 
 `ifdef test_hdmi,
-  output wire TMDI_CK_P, TMDI_CK_N,
-  output wire [2:0]TMDI_TX_P, TMDI_TX_N
+  output wire [3:0]HDMI_TX_P, HDMI_TX_N
 `endif
 
 `ifdef test_eth,
@@ -277,7 +276,13 @@ localparam dot_scale = 10;
 //   assign clk_pixel = CLK25;
 //   assign clk_shift = clk125;
 
-  wire [7:0] vga_r, vga_g, vga_b;
+  wire [10:0] beam_x, beam_y;
+  wire [7:0] gs = beam_x[9:2];
+  wire [7:0] cbr = {8{beam_x[8]}}, cbg = {8{beam_x[7]}}, cbb = {8{beam_x[6]}};
+  wire [7:0] vr, vg, vb;
+  assign { vr, vg, vb } = beam_y > DVI_V_ACTIVE / 2 ? { cbr, cbg, cbb } : { gs, gs, gs };
+
+  wire [7:0] vtp_r, vtp_g, vtp_b;
   wire vga_hsync, vga_vsync, vga_blank;
   vga
   #(
@@ -292,14 +297,14 @@ localparam dot_scale = 10;
     .c_bits_x(11),
     .c_bits_y(11)
   )
-  vga_instance
+  vga
   (
     .clk_pixel(clk_pixel),
     .clk_pixel_ena(1'b1),
-    .test_picture(1'b1), // enable test picture generation
-    .vga_r(vga_r),
-    .vga_g(vga_g),
-    .vga_b(vga_b),
+    .beam_x(beam_x), .beam_y(beam_y),
+    .vga_r(vtp_r),
+    .vga_g(vtp_g),
+    .vga_b(vtp_b),
     .vga_hsync(vga_hsync),
     .vga_vsync(vga_vsync),
     .vga_blank(vga_blank)
@@ -311,13 +316,13 @@ localparam dot_scale = 10;
     .c_ddr(1'b1),
     .c_shift_clock_synchronizer(1'b0) // would 1 work?
   )
-  vga2dvid_instance
+  vga2dvid
   (
     .clk_pixel(clk_pixel),
     .clk_shift(clk_shift),
-    .in_red(vga_r),
-    .in_green(vga_g),
-    .in_blue(vga_b),
+    .in_red(vr),
+    .in_green(vg),
+    .in_blue(vb),
     .in_hsync(vga_hsync),
     .in_vsync(vga_vsync),
     .in_blank(vga_blank),
@@ -327,51 +332,15 @@ localparam dot_scale = 10;
     .out_blue (tmds_ddr[1:0])
   );
 
-  wire [3:0]tmdi_p, tmdi_n;
-  assign tmdi_p[3] = TMDI_CK_P, tmdi_n[3] = TMDI_CK_N;
-  assign tmdi_p[2:0] = TMDI_TX_P, tmdi_n[2:0] = TMDI_TX_N;
   generate
     genvar i;
     for(i = 0; i < 4; i = i + 1) begin
       wire ddr_out;
       ODDR #(.DDR_CLK_EDGE("SAME_EDGE")) ddr (.D1(tmds_ddr[i*2]), .D2(tmds_ddr[i*2+1]), .Q(ddr_out),
                  .C(clk_shift), .CE(1'b1), .S(1'b0), .R(1'b0));
-      OBUFDS vidout(.I(ddr_out), .O(tmdi_p[i]), .OB(tmdi_n[i]));
+      OBUFDS vidout(.I(ddr_out), .O(HDMI_TX_P[i]), .OB(HDMI_TX_N[i]));
     end
   endgenerate
-//  assign H4_11 = vga_hsync, H4_12 = vga_vsync;
-//       H4_13 = tmds_ddr[2], H4_14 = tmds_ddr[3];
-//	 H4_15 = tmds_ddr[4], H4_16 = tmds_ddr[5],
-//	 H4_17 = tmds_ddr[6], H4_18 = tmds_ddr[7];
-
-//   reg [9:0] sctr = 0;
-//   always @(posedge CLK25)
-//     sctr = sctr + 1'b1;
-
-//   reg [9:0] pctr = 0;
-//   always @(posedge clk_pixel)
-//     pctr = pctr + 1'b1;
-
-//   OBUFDS ob0(.I(vga_vsync), .O(H4_11), .OB(H4_12));
-//   OBUFDS ob1(.I(vga_hsync), .O(H4_14), .OB(H4_13));
-//   OBUFDS ob2(.I(pctr[9]), .O(H4_16), .OB(H4_15));
-//   OBUFDS ob3(.I(sctr[9]), .O(H4_18), .OB(H4_17));
-//   assign H4_19 = 1'b0, H4_20 = 1'b0;
-//   OBUF #(.SLEW("FAST")) ob8(.I(ctr[1]), .O(H4_19));
-//   OBUF #(.SLEW("FAST")) ob9(.I(ctr[0]), .O(H4_20));
-
-//  OBUFDS hout (.I(ctr[11]), .O(H4_18), .OB(H4_17));
-//  OBUFDS hout2 (.I(ctr[12]), .O(H4_16), .OB(H4_15));
-
-//  wire d11, d13, d16, d18;
-//  ODDR ddr1 (.D1(tmds_ddr[6]), .D2(tmds_ddr[7]), .Q(d11));
-//  OBUFDS vidout1(.I(d11), .O(H4_11), .OB(H4_12));
-//  ODDR ddr2 (.D1(tmds_ddr[4]), .D2(tmds_ddr[5]), .Q(d13));
-//  OBUFDS vidout2(.I(d13), .O(H4_14), .OB(H4_13));
-//  ODDR ddr3 (.D1(tmds_ddr[2]), .D2(tmds_ddr[3]), .Q(d16));
-//  OBUFDS vidout3(.I(d16), .O(H4_16), .OB(H4_15));
-//  ODDR ddr4 (.D1(tmds_ddr[0]), .D2(tmds_ddr[1]), .Q(d18));
-//  OBUFDS vidout4(.I(d18), .O(H4_18), .OB(H4_17));
 `endif
 
 
