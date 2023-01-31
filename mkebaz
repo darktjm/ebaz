@@ -96,14 +96,14 @@ while [ "$#" -gt 0 ]; do
 done
 echo "Pack"
 test "$top".eblif -nt "$top".net || \
-  symbiflow_pack -e "$top".eblif -d $dev ${sdc:+-s "$sdc"}
+  symbiflow_pack -e "$top".eblif -d $dev ${sdc:+-s"$sdc"}
 echo "Place"
 test "$top".net -nt "$top".place || \
   symbiflow_place -e "$top".eblif -d $dev -P $part -n "$top".net \
-    ${sdc:+-s "$sdc"} ${pcf:+-p "$pcf"}
+    ${sdc:+-s"$sdc"} ${pcf:+-p"$pcf"}
 echo "Route"
 test "$top".place -ot "$top".route || \
-  symbiflow_route -e "$top".eblif -d $dev ${sdc:+-s "$sdc"}
+  symbiflow_route -e "$top".eblif -d $dev ${sdc:+-s"$sdc"}
 echo "Fasm"
 test "$top".route -ot "$top".fasm || \
   symbiflow_write_fasm -e "$top".eblif -d $dev

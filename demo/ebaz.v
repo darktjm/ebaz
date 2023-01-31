@@ -276,9 +276,15 @@ localparam dot_scale = 10;
 //   assign clk_pixel = CLK25;
 //   assign clk_shift = clk125;
 
+  localparam x_bits = $clog2(DVI_H_ACTIVE);
+  
   wire [10:0] beam_x, beam_y;
-  wire [7:0] gs = beam_x[9:2];
-  wire [7:0] cbr = {8{beam_x[8]}}, cbg = {8{beam_x[7]}}, cbb = {8{beam_x[6]}};
+  wire [10:0] ibeam_x = DVI_H_ACTIVE - 1 - beam_x;
+  wire [7:0] gs = beam_x > DVI_H_ACTIVE / 2 ?
+                     beam_x[x_bits - 2:x_bits - 9] :
+                     ibeam_x[x_bits - 2:x_bits - 9];
+  wire [7:0] cbr = {8{beam_x[x_bits - 1]}}, cbg = {8{beam_x[x_bits - 2]}},
+             cbb = {8{beam_x[x_bits - 3]}};
   wire [7:0] vr, vg, vb;
   assign { vr, vg, vb } = beam_y > DVI_V_ACTIVE / 2 ? { cbr, cbg, cbb } : { gs, gs, gs };
 
