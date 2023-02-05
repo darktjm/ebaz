@@ -47,11 +47,11 @@ static const struct tlimit {
     /* MMCME2 Speed grade 3 */
     { 10, 800, 4.69, 800, 600, 1600, 10, 550 },
     /* PLLE2 Speed grade 1* */
-    { 19, 800, 6.25, 800, 600, 1600, 19, 440 },
+    { 19, 800, 6.25, 800, 800, 1600, 19, 440 },
     /* PLLE2 Speed grade 2 */
-    { 19, 800, 6.25, 800, 600, 1866, 19, 500 },
+    { 19, 800, 6.25, 800, 800, 1866, 19, 500 },
     /* PLLE2 Speed grade 3 */
-    { 19, 800, 6.25, 800, 600, 2133, 19, 550 }
+    { 19, 800, 6.25, 800, 800, 2133, 19, 550 }
 };
 
 int main(int argc, const char **argv)
@@ -247,14 +247,17 @@ int main(int argc, const char **argv)
     // Go in reverse dir so lower dividers are preferred
     // (the last best value is always chosen)
     for(int idiv = maxidiv; idiv >= 1; idiv--) {
-	int maxfbdiv = limit.FVCOMAX / FCLKIN1 * idiv;
+	int maxfbdiv = ceil(limit.FVCOMAX / FCLKIN1 * idiv);
+	int minfbdiv = floor(limit.FVCOMIN / FCLKIN1 * idiv);
+	if(minfbdiv < 2)
+	    minfbdiv = 2;
 	if(maxfbdiv > 64)
 	    maxfbdiv = 64;
 	if(use_mmcm)
 	    maxfbdiv *= 8;
 	// But go in forward direction for multipliers, so the largest VCO
 	// will be chosen
-	for(int fbdiv = 2; fbdiv <= maxfbdiv; fbdiv++) {
+	for(int fbdiv = minfbdiv; fbdiv <= maxfbdiv; fbdiv++) {
 	    double fvco = FCLKIN1 * fbdiv / idiv;
 	    if(use_mmcm)
 		fvco /= 8;
@@ -344,9 +347,10 @@ int main(int argc, const char **argv)
 	 "\t// Phase and duty cycle not directly supported");
     for(int i = 0; i < 7; i++) {
 	const char c = i == 5 && !use_mmcm ? ';' : ',';
-	printf("\tCLKOUT%d_PHASE = 0.0, CLKOUT%d_DUTY_CYCLE = 0.50%c\n", i, i, c);
+	printf("\t%s_PHASE = 0.0, %s_DUTY_CYCLE = 0.50%c\n", oname[i], oname[i], c);
 	if(use_mmcm && !i)
-	    puts("\tCLKOUT0_USE_FINE_PS = \"FALSE\", CLKFBOUT_USE_FINE_PS = \"FALSE\",");
+	    printf("\t%s_USE_FINE_PS = \"FALSE\", CLKFBOUT_USE_FINE_PS = \"FALSE\",\n",
+		  oname[0]);
 	if(c == ';')
 	    break;
     }
@@ -377,12 +381,13 @@ int main(int argc, const char **argv)
 	printf("\t.CLKOUT4_CASCADE(\"%s\"),\n",
 	       clk6_clk4 ? "TRUE" : "FALSE");
     for(int i = 0; i < 7; i++) {
-	printf("\t.CLKOUT%d_PHASE(CLKOUT%d_PHASE),\n"
-	       "\t.CLKOUT%d_DUTY_CYCLE(CLKOUT%d_DUTY_CYCLE),\n",
-	       i, i, i, i);
+	printf("\t.CLKOUT%d_PHASE(%s_PHASE),\n"
+	       "\t.CLKOUT%d_DUTY_CYCLE(%s_DUTY_CYCLE),\n",
+	       i, oname[i], i, oname[i]);
 	if(use_mmcm && !i)
-	    puts("\t.CLKOUT0_USE_FINE_PS(CLKOUT0_USE_FINE_PS),\n"
-		 "\t.CLKFBOUT_USE_FINE_PS(CLKFBOUT_USE_FINE_PS),\n");
+	    printf("\t.CLKOUT0_USE_FINE_PS(%s_USE_FINE_PS),\n"
+		   "\t.CLKFBOUT_USE_FINE_PS(CLKFBOUT_USE_FINE_PS),\n",
+		  oname[0]);
 	if(i == 5 && !use_mmcm)
 	    break;
     }

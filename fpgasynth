@@ -221,7 +221,7 @@ do_yosys() {
       # nexus proc+flatten in coarse always
       # xilinx proc before coarse (+ a ton of other crap), flatten only w/ -flatten
       # I suppose adding proc; flatten here wouldn't hurt
-      echo "synth_${arch[0]} -run :coarse; proc; flatten; proc;;;"
+      echo "synth_${arch[0]} -run :coarse ${top:+-top $top}; proc; flatten; proc;;;"
     else
       echo "prep -flatten ${top:+-top $top};;;"
     fi

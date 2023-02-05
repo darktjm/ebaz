@@ -1,0 +1,48 @@
+#!/bin/sh
+
+# BASE might seem more appropriate, but not only does my tool not generate it:
+# Message: Failed to find matching architecture model for 'PLLE2_BASE'
+# There is an issue for this on f4pga-examples, but no progress in a year
+
+# With the 125MHz default ebaz clock, video timing is off more than
+# it would be with a 100MHz clock, so 100MHz is generated/used for video
+xc7-pll CLKIN1name=fclk FCLKIN1=125 \
+       CLKOUT0name=clk25 FCLKOUT0=25 \
+       CLKOUT1name=clk100 FCLKOUT1=100
+
+# Note that there is no guarantee that shift == 5*pixel, so manual verifiation
+# is required.  If it doesn't match, I'm not sure how to force a better result.
+# With BUFR, this wouldn't be a problem:  just generate shift and divide by
+# 5.  No BUFR in the free tools, though.
+vpll() {
+   xc7-pll $m modname=vpll${m#-}${1/./_} \
+       CLKIN1name=clk100 FCLKIN1=100 \
+       CLKOUT0name=clk_pixel FCLKOUT0=$1 \
+       CLKOUT1name=clk_shift FCLKOUT1=$2 \
+       ${m:+FVCOMAX=1208} # Cheat: A little over 1200 for 2560x1440@60
+}
+# -m (MMCM) is more accurate, but f4pga chokes:
+# Message: Failed to find matching architecture model for 'MMCME2_ADV_VPR'
+# even if I convert it to BASE (see above: BASE is not supported either way)
+# Message: Failed to find matching architecture model for 'MMCME2_BASE'
+# I opened up an issue, but it was ignored.
+for m in "" -m; do
+# 2560x1440@30Hz
+vpll 120.75 603.75
+# 2560x1440@60Hz
+vpll 241.5 1207.5   # 99.38% w/ PLL; 100% w/ MMCM if I cheat
+# 2560x1440@75Hz
+# Too fast for MMCM
+test -z "$m" && \
+vpll 304.25 1521.25 # 100.25% w/ PLL; no MMCM
+# 1920x1080@60Hz
+vpll 148.5  742.5   # 99.38% w/ PLL; 100% w/ MMCM
+# 1280x720@60Hz 1920x1080@30Hz
+vpll 74.25 371.25   # 100.56% w/ PLL; 100% w/ MMCM
+# 1024x768@60Hz
+vpll 65    325      # 100% w/ both
+# 800x600@60Hz
+vpll 40    200      # 100% w/ both
+# 640x480@60Hz
+vpll 25.2  126      # 100% w/ both
+done

@@ -115,15 +115,25 @@ Other files of note:
     the uart code):
       - LCD support: <https://github.com/emard/ulx3s-misc> spi_display example
       - HDMI support: <https://github.com/emard/ulx3s-misc> dvi example
+      - HDMI audio support: <https://github.com/emard/Minimig_ECS>
+	HDMI output.  Derived from <https://github.com/fintros/hdmi-audio/>,
+	presumably.  Currently doesn't work.  Note that I also tried
+	<https://github.com/hdl-util/hdmi>, but it's a pain to use
+	(especially since it's System Verilog, which isn't directly
+	supported by yosys and the Surelog/UHDM plugin is buggy and
+	doesn't support parameterization) so I abandoned it.  I need
+	to finally read the specs myself to get something working.
+	Not that I intended to pay hundreds of dollars for the
+	privilege of reading some damn standards (especially since
+	many refer to other standards, resulting in many more hundreds
+	of dollars of documents that by all rights should be free of
+	charge).
       - UART: <https://github.com/jamesbowman/swapforth> j1b (with
 	broken merge in progress of j1a/j1b by me)
     These include minor patches to fix compilation issues with Vivado
-    and/or f4pga.  I will probably eventually provide a patch list for
-    convenience.  Note also that the dvi example code was built from
-    VHDL using the ulx3s-misc makefile.  I try to use the GHDL plugin
-    for that sort of thing, but it doesn't work with generic
-    parameters, and not doing so just elimiates one more source of
-    headaches.
+    and/or f4pga, as well as VHDL to Verilog conversion (GHDL's yosys
+    plugin doesn't support generics and crashes on a whim).  I will
+    probably eventually provide a patch list for convenience.
 
 During HDMI debugging, I also verified the H4 pins work as expected. 
 I have successfully booted from SD card (instead of moving the
@@ -170,7 +180,7 @@ better reports, it has many more missing primitives (maybe because I
 built it incorrectly, but it's hard for me to tell either way). I do
 not see f4pga going anywhere I want to follow, so if I do put effort
 into making a free tool work better, it will be nextpnr-xilinx.
-Significantly less than 60k/3G files, and at least far less Python
+Significantly less than 60k/3GB files, and at least far less Python
 (seems impossible to get away from it entirely without rewriting
 everything from scratch).
 
@@ -178,7 +188,7 @@ Given my frustration with how f4pga is structured and the lack of
 support for important things (no devices other than what the free
 version of Vivado supports, anyway, but with fewer components, longer
 compile times, and just as little control over what happens since
-managing 60k/3G installed files is bullshit), I will likely never use
+managing 60k/3GB installed files is bullshit), I will likely never use
 f4pga again.  The only development that might change my mind is
 xc7k325t support, which likely won't happen.  The only artifact I have
 preserved from my previous use of f4pga is a small patch to reduce the

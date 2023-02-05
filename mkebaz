@@ -130,3 +130,13 @@ cat <<EOF >ebaz.int
 //  ... up to 256 register inits
 EOF
 bootgen -arch zynq -image boot.bif -o boot.bin
+
+Recommended for fast NAND boot (1st line also for SD boot):
+slcr.ARM_CLK_CTRL  Both    Both     0x1F000200 CPU divisor = 2 (433 MHz)
+slcr.SMC_CLK_CTRL  Both    Both     0x00000921 Baud rate divisor = 9 (96 MHz, 10.4 ns)
+                                               Timing Parameters:
+smc.set_cycles     Both  Non-secure 0x00225133 t_rr=2, t_ar=1, t_clr=1, t_wp=2,
+                                               t_rea=1, t_wc=3, t_rc=3
+smc.set_opmode     8-bit Non-secure 0x00000000 8-bit width
+                  16-bit Non-secure 0x00000001 16-bit width
+smc.direct_cmd     Both  Non-secure 0x02400000 Select ModeReg and UpdateRegs
