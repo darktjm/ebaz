@@ -1,0 +1,79 @@
+#!/bin/sh
+
+# Build ebaz.v into a bitstream, using either Vivado or f4pga.
+# FIXME: support nextpnr-xilinx as well
+# Currently, HDMI only works well in Vivado.  In fact, unless MMCM gets
+# supported, I can't see any reason to use the free tools.
+
+odir=build-ebaz
+rm -rf $odir
+  # Build using Vivado
+  # As of now:
+  #  Vivado 2017.2 barfs on my zynq macro library
+  # Vivado 2022.1, 2022.2 crash in GUI on trying to start processing.
+  #   I guess this is what finally motivated me to try a TCL script, but:
+  # Vivado 2022.1, 2022.2 crash on completion of routing (corrupted memory?)
+  # Well, at least running in Vivado told me some useful things, like:
+  #   apparently, my low limit for VCO freq in xc7-pll was wrong.
+  #   xc7-pll was also basically ignoring the VCO low limit, right or wrong
+  #   there are numerous (137 reported) potential timing glitches
+  # Vivado seems to eventually create this itself, but not before complaining
+  mkdir -p $odir
+  # 2022 crashes, so make it 2017 compatible
+  # There seems to be no way to control where this goes
+  rm -f tight_setup_hold_pins.txt usage_statistics_webtalk.{xml,html}
+  #. /opt/Xilinx/Vivado/2022.2/settings64.sh
+  # Note that for me, "vivado" is a wrapper script that performs the above,
+  # as well as disabling 'net access and supporting 3 versions: 2022.1,
+  # 2022.2 (-n), and 2017.2 (-o).  Since 2022 crashes after routing, I'm
+  # using 2017.2.
+  verilator -I../.. -P -E top.v >top_preproc.v
+  cat >$odir/build.tcl <<EOF
+    create_project -in_memory -part xc7z010clg400-1
+    # uart & ebaz are last so their default_nettype doesn't interfere
+    read_verilog -sv {
+      ../pll.v
+      audio_clock_regeneration_packet.sv audio_info_frame.sv 
+      audio_sample_packet.sv auxiliary_video_information_info_frame.sv
+      hdmi.sv packet_assembler.sv packet_picker.sv
+      source_product_description_info_frame.sv tmds_channel.sv
+      top_preproc.v }
+    read_xdc ../../ebaz.xdc
+
+    synth_design -top top -part xc7z010clg400-1
+    report_timing_summary -file $odir/synth_timing_summary.rpt
+    report_power -file $odir/synth_power.rpt
+    write_checkpoint -force $odir/synthesis
+
+    opt_design
+    place_design
+    phys_opt_design
+    report_timing_summary -file $odir/place_timing_summary.rpt
+    write_checkpoint -force $odir/place
+    # I cheat on one of the MMCMs:  1207 VCO w/ max 1200
+    # If there is a way to turn it into a warning, I can't find the docs
+    set_property IS_ENABLED FALSE [get_drc_checks PDRC-34]
+    route_design
+    # !!!!!!!!!!!!!!!!!!! Crash !!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    # Either a seg fault or:
+    # free(): invalid pointer
+    # Abnormal program termination (6)
+    report_timing_summary -file $odir/route_timing_summary.rpt
+    report_timing -sort_by group -max_paths 100 -path_type summary -file $odir/route_timing.rpt
+    report_clock_utilization -file $odir/clock_util.rpt
+    report_utilization -file $odir/route_util.rpt
+    report_power -file $odir/route_power.rpt
+    report_drc -file $odir/route_drc.rpt
+    write_checkpoint -force $odir/route
+
+    write_bitstream -force $odir/ebaz.bit
+EOF
+  # see above for "-o" option interpretation
+  vivado -o -mode batch -nojournal -nolog -source $odir/build.tcl
+  ret=$?
+  # There seems to be no way to control where this goes
+  mv -f tight_setup_hold_pins.txt $odir >/dev/null 2>&1 || :
+  mv -f usage_statistics_webtalk.{html,xml} $odir >/dev/null 2>&1
+  mv -f fsm_encofing.os $odir >/dev/null 2>&1
+  #rm -rf .Xil
+  exit $ret
