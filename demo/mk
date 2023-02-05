@@ -7,7 +7,10 @@
 
 odir=build-ebaz
 rm -rf $odir
-./mkpll >pll.v
+# Vivado seems to eventually create this itself, but not before complaining
+mkdir -p $odir
+# So I might as well create pll.v there
+./mkpll >$odir/pll.v
 #ULX_DIR=../../ulx3s-misc/examples
 #LCD_DIR=${ULX_DIR}/spi_display/hdl/spi_display_verilog
 #DVI_DIR=${ULX_DIR}/dvi/hdl
@@ -29,8 +32,6 @@ case "$1" in
   #   apparently, my low limit for VCO freq in xc7-pll was wrong.
   #   xc7-pll was also basically ignoring the VCO low limit, right or wrong
   #   there are numerous (137 reported) potential timing glitches
-  # Vivado seems to eventually create this itself, but not before complaining
-  mkdir -p $odir
   # 2022 crashes, so make it 2017 compatible
   # There seems to be no way to control where this goes
   rm -f tight_setup_hold_pins.txt usage_statistics_webtalk.{xml,html}
@@ -44,7 +45,7 @@ case "$1" in
     create_project -in_memory -part xc7z010clg400-1
     # uart & ebaz are last so their default_nettype doesn't interfere
     read_verilog -sv {
-      pll.v
+      $odir/pll.v
       ${LCD_DIR}/lcd_video.v
       ${DVI_DIR}/vga.v
       hdmi/audio_clock_regeneration_packet.sv hdmi/audio_info_frame.sv
@@ -102,7 +103,7 @@ EOF
   # FIXME: make this work
   # Currently fails w/ ODDR->IOBUFDS:
   # ERROR: Failed to route arc 0 of net 'genblk1[2].ddr_out', from SITEWIRE/OLOGIC_X0Y96/OUTFF_Q to SITEWIRE/IOB_X0Y95/O_IN.
-  fpgasynth -x -o ebaz -t top ebaz.v pll.v \
+  fpgasynth -x -o ebaz -t top ebaz.v $odir/pll.v \
     ${LCD_DIR}/lcd_video.v \
     ${DVI_DIR}/vga.v \
     ${UART_DIR}/uart.v \
@@ -113,7 +114,7 @@ EOF
   ;;
  *)
   # Build using f4pga (mkebaz)
-  ../mkebaz -t top ebaz.v ${LIB_DIR}/ebaz.xdc pll.v ebaz.sdc \
+  ../mkebaz -t top ebaz.v ${LIB_DIR}/ebaz.xdc $odir/pll.v ebaz.sdc \
     ${LCD_DIR}/lcd_video.v \
     ${DVI_DIR}/vga.v \
     ${UART_DIR}/uart.v \

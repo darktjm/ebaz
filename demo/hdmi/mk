@@ -19,6 +19,7 @@ rm -rf $odir
   #   there are numerous (137 reported) potential timing glitches
   # Vivado seems to eventually create this itself, but not before complaining
   mkdir -p $odir
+  ../mkpll >$odir/pll.v
   # 2022 crashes, so make it 2017 compatible
   # There seems to be no way to control where this goes
   rm -f tight_setup_hold_pins.txt usage_statistics_webtalk.{xml,html}
@@ -27,17 +28,17 @@ rm -rf $odir
   # as well as disabling 'net access and supporting 3 versions: 2022.1,
   # 2022.2 (-n), and 2017.2 (-o).  Since 2022 crashes after routing, I'm
   # using 2017.2.
-  verilator -I../.. -P -E top.v >top_preproc.v
+  verilator -I../.. -P -E top.v >$odir/top_preproc.v
   cat >$odir/build.tcl <<EOF
     create_project -in_memory -part xc7z010clg400-1
     # uart & ebaz are last so their default_nettype doesn't interfere
     read_verilog -sv {
-      ../pll.v
+      $odir/pll.v
       audio_clock_regeneration_packet.sv audio_info_frame.sv 
       audio_sample_packet.sv auxiliary_video_information_info_frame.sv
       hdmi.sv packet_assembler.sv packet_picker.sv
       source_product_description_info_frame.sv tmds_channel.sv
-      top_preproc.v }
+      $odir/top_preproc.v }
     read_xdc ../../ebaz.xdc
 
     synth_design -top top -part xc7z010clg400-1
@@ -75,5 +76,5 @@ EOF
   mv -f tight_setup_hold_pins.txt $odir >/dev/null 2>&1 || :
   mv -f usage_statistics_webtalk.{html,xml} $odir >/dev/null 2>&1
   mv -f fsm_encofing.os $odir >/dev/null 2>&1
-  #rm -rf .Xil
+  rm -rf .Xil
   exit $ret
