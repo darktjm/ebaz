@@ -114,26 +114,15 @@ Other files of note:
     errors on my part (but I still managed to sneak an error into
     the uart code):
       - LCD support: <https://github.com/emard/ulx3s-misc> spi_display example
-      - HDMI support: <https://github.com/emard/ulx3s-misc> dvi example
-      - HDMI audio support: <https://github.com/emard/Minimig_ECS>
-	HDMI output.  Derived from <https://github.com/fintros/hdmi-audio/>,
-	presumably.  Currently doesn't work.  Note that I also tried
-	<https://github.com/hdl-util/hdmi>, but it's a pain to use
-	(especially since it's System Verilog, which isn't directly
-	supported by yosys and the Surelog/UHDM plugin is buggy and
-	doesn't support parameterization) so I abandoned it.  I need
-	to finally read the specs myself to get something working.
-	Not that I intended to pay hundreds of dollars for the
-	privilege of reading some damn standards (especially since
-	many refer to other standards, resulting in many more hundreds
-	of dollars of documents that by all rights should be free of
-	charge).
+      - HDMI with audio support: <https://github.com/hdl-util/hdmi> with
+        some modifications by me.  It's System Verilog, not supported by
+	yosys directly.  I will (re-)port it to something more yosys-friendly
+	at some point, but I can't use f4pga to make working HDMI, anyway,
+	so I've only made minor modifications.
       - UART: <https://github.com/jamesbowman/swapforth> j1b (with
 	broken merge in progress of j1a/j1b by me)
     These include minor patches to fix compilation issues with Vivado
-    and/or f4pga, as well as VHDL to Verilog conversion (GHDL's yosys
-    plugin doesn't support generics and crashes on a whim).  I will
-    probably eventually provide a patch list for convenience.
+    and/or f4pga.
 
 During HDMI debugging, I also verified the H4 pins work as expected. 
 I have successfully booted from SD card (instead of moving the
@@ -147,7 +136,7 @@ for decent instructions on how to boot from the pre-loaded flash.
 Part of the reason I prefer the default flash is that the kernel has
 the old `/dev/xcdevcfg` device for programming the FPGA:
 
->       scp build-*/*.bit ebaz:/tmp && ssh ebaz "cat /tmp/*.bi? >/dev/xdevcfg"
+>       scp build-*/*.bit ebaz:/tmp && ssh -n ebaz "cat /tmp/*.bi? >/dev/xdevcfg"
 
 The only SD card images I have require much more work so that I can
 actually use the newer firmware-style programming method (e.g. the

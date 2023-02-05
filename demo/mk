@@ -17,10 +17,6 @@ DVI_DIR=ulx3s-misc
 UART_DIR=j1c
 #LIB_DIR=${HOME}/fpga/lib
 LIB_DIR=..
-# hdmidelay uses double-packed array, not suppored by vhd2vl?
-for x in av_hdmi encoder; do
-   vhd2vl hdmi-audio/$x.vhd >hdmi-audio/$x.v
-done
 case "$1" in
  -v)
   # Build using Vivado
@@ -51,9 +47,10 @@ case "$1" in
       pll.v
       ${LCD_DIR}/lcd_video.v
       ${DVI_DIR}/vga.v
-      ${DVI_DIR}/tmds_encoder.v ${DVI_DIR}/vga2dvid.v
-      hdmi-audio/av_hdmi.v hdmi-audio/encoder.v hdmi-audio/hdmidataencoder.v
-      hdmi-audio/hdmidelay.v
+      hdmi/audio_clock_regeneration_packet.sv hdmi/audio_info_frame.sv
+      hdmi/audio_sample_packet.sv hdmi/auxiliary_video_information_info_frame.sv
+      hdmi/hdmi.sv hdmi/packet_assembler.sv hdmi/packet_picker.sv
+      hdmi/source_product_description_info_frame.sv hdmi/tmds_channel.sv
       ${UART_DIR}/uart.v
       $odir/ebaz_preproc.v }
     read_xdc ../ebaz.xdc
@@ -92,6 +89,8 @@ EOF
   # There seems to be no way to control where this goes
   mv -f tight_setup_hold_pins.txt $odir >/dev/null 2>&1 || :
   mv -f usage_statistics_webtalk.{html,xml} $odir >/dev/null 2>&1
+  mv -f fsm_encofing.os $odir >/dev/null 2>&1
+  rm -rf .Xil
   exit $ret
   ;;
  -n)
@@ -107,9 +106,10 @@ EOF
     ${LCD_DIR}/lcd_video.v \
     ${DVI_DIR}/vga.v \
     ${UART_DIR}/uart.v \
-    ${DVI_DIR}/tmds_encoder.v ${DVI_DIR}/vga2dvid.v \
-    hdmi-audio/av_hdmi.v hdmi-audio/encoder.v hdmi-audio/hdmidataencoder.v \
-    hdmi-audio/hdmidelay.v
+    hdmi/audio_clock_regeneration_packet.sv hdmi/audio_info_frame.sv \
+    hdmi/audio_sample_packet.sv hdmi/auxiliary_video_information_info_frame.sv \
+    hdmi/hdmi.sv hdmi/packet_assembler.sv hdmi/packet_picker.sv \
+    hdmi/source_product_description_info_frame.sv hdmi/tmds_channel.sv
   ;;
  *)
   # Build using f4pga (mkebaz)
@@ -117,8 +117,9 @@ EOF
     ${LCD_DIR}/lcd_video.v \
     ${DVI_DIR}/vga.v \
     ${UART_DIR}/uart.v \
-    ${DVI_DIR}/tmds_encoder.v ${DVI_DIR}/vga2dvid.v \
-    hdmi-audio/av_hdmi.v hdmi-audio/encoder.v hdmi-audio/hdmidataencoder.v \
-    hdmi-audio/hdmidelay.v
+    hdmi/audio_clock_regeneration_packet.sv hdmi/audio_info_frame.sv \
+    hdmi/audio_sample_packet.sv hdmi/auxiliary_video_information_info_frame.sv \
+    hdmi/hdmi.sv hdmi/packet_assembler.sv hdmi/packet_picker.sv \
+    hdmi/source_product_description_info_frame.sv hdmi/tmds_channel.sv
   ;;
 esac

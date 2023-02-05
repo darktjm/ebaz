@@ -41,7 +41,6 @@
 //`define test_uart
 //    HDMI connector
 `define test_hdmi
-`define hdmi_audio
 // f4pga (yosys+vpr) and (yosys+)nextpnr-xilinx do not support MMCM
 // (technically f4pga supports MMCM, but not on xc7z010).
 `ifndef YOSYS
@@ -61,18 +60,24 @@
 //     with tons of red vertical stripes.  No audio.
 //   Using old dvi encoder, only 1024x768, 1280x720 have video, and that's
 //     corrupted w/ red vertical stripes (mostly stable, though)
+//   Not yet ready to test "hdmi" encoder
 // yosys+nextpnr-xilinx: (no MMCM, no BUFR)
 //   Fails to build; can't route ODDR to OBUFDS.
 // Vivado:
 //   Perfect video with dvi and hdmi-audio encoder up to 1920x1080@30
-//   No video with either encoder past that.
-//   No audio with hdmi-audio
+//     No video with either encoder past that.  No audio.
+//   Perfect video+audio using "hdmi" encoder up to 1920x1080@30
+//   No video+audio 1920x1080@60 2560x1440
+//     However, when I ran independent tests, I got video @1920x1080@60
+//     and video+audio @2560x1440.  I guess it depends on how things get
+//     optimized/layed out.
 //`define r640x480
 //`define r800x600
 //`define r1024x768
-`define r1280x720
-//`define r1920x1080_30
+//`define r1280x720
+`define r1920x1080_30
 //`define r1920x1080
+//`define r2560x1440_30
 //`define r2560x1440
 //`define r2560x1440_75
 //    18 pins on .100/2.54mm header (H4)
@@ -234,6 +239,7 @@ assign { H4_03, H4_04, H4_05, H4_06, H4_07, H4_08,
   // VGA signal generator
 
 `ifdef r640x480 // @60Hz
+localparam mode_id = 1;
 // Parameters for old static Verilog PLL calculator
 localparam dot_clk = 252;
 localparam dot_scale = 10;
@@ -254,6 +260,7 @@ localparam DVI_V_POLAR = 1'b0;
 `endif
 
 `ifdef r800x600 // @60Hz
+localparam mode_id = 0; // No defined code; probably never will be
 // Parameters for old static Verilog PLL calculator
 localparam dot_clk = 40;
 localparam dot_scale = 1;
@@ -274,6 +281,7 @@ localparam DVI_V_POLAR = 1'b1;
 `endif
 
 `ifdef r1024x768 // @60Hz
+localparam mode_id = 0; // No defined code; probably never will be
 // Parameters for old static Verilog PLL calculator
 localparam dot_clk = 65;
 localparam dot_scale = 1;
@@ -294,6 +302,7 @@ localparam DVI_V_POLAR = 1'b0;
 `endif
 
 `ifdef r1280x720 // @60Hz
+localparam mode_id = 4;
 // Parameters for old static Verilog PLL calculator
 localparam dot_clk = 7425;
 localparam dot_scale = 100;
@@ -320,6 +329,7 @@ localparam DVI_V_POLAR  = 1'b1;
 `endif
 
 `ifdef r1920x1080_30
+localparam mode_id = 34;
 // Parameters for old static Verilog PLL calculator
 localparam dot_clk = 7425;
 localparam dot_scale = 100;
@@ -346,6 +356,7 @@ localparam DVI_V_POLAR  = 1'b1;
 `endif
 
 `ifdef r1920x1080 // @60Hz
+localparam mode_id = 16;
 // Parameters for old static Verilog PLL calculator
 localparam dot_clk = 2415;
 localparam dot_scale = 10;
@@ -371,7 +382,36 @@ localparam DVI_V_SYNC   = 12'd5;
 localparam DVI_V_POLAR  = 1'b0;
 `endif
 
+`ifdef r2560x1440_30
+localparam mode_id = 0; // No defined code; custom mode not in my monitor
+// Parameters for old static Verilog PLL calculator
+localparam dot_clk = 12075;
+localparam dot_scale = 100;
+// Parameter for current static PLLs
+`ifndef mmcm
+`define vpll vpll120_75
+`else
+`define vpll vpllm120_75
+`endif
+// Parameters for dynamic PLL, if ever (99.38% accurate PLL)
+// DIVCLK_DIVIDE=1 CLKOUT0_DIVIDE=10 CLKOUT1_DIVIDE=2 CLKFBOUT_MULT=12
+// MMCM (100%) -- cheat: set max VCO freq = 1208
+//                       needs DRC PDRC-34 disabled
+// DIVCLK_DIVIDE=5 CLKOUT0_DIVIDE_F=10 CLKOUT1_DIVIDE=2 CLKFBOUT_MULT_F=60.375
+localparam DVI_H_BPORCH = 12'd80;
+localparam DVI_H_ACTIVE = 12'd2560;
+localparam DVI_H_FPORCH = 12'd48;
+localparam DVI_H_SYNC   = 12'd32;
+localparam DVI_H_POLAR  = 1'b1;
+localparam DVI_V_BPORCH = 12'd33;
+localparam DVI_V_ACTIVE = 12'd1440;
+localparam DVI_V_FPORCH = 12'd3;
+localparam DVI_V_SYNC   = 12'd5;
+localparam DVI_V_POLAR  = 1'b1;
+`endif
+
 `ifdef r2560x1440 // @60Hz
+localparam mode_id = 0; // No defined code; probably never will be
 // Parameters for old static Verilog PLL calculator
 localparam dot_clk = 2415;
 localparam dot_scale = 10;
@@ -424,6 +464,7 @@ localparam DVI_V_POLAR  = 1'b1;
 //localparam dot_scale = 1;
 
 `ifdef r2560x1440_75
+localparam mode_id = 0; // No defined code; probably never will be
 // Parameters for old static Verilog PLL calculator
 localparam dot_clk = 30425;
 localparam dot_scale = 100;
@@ -456,103 +497,66 @@ localparam DVI_V_POLAR  = 1'b0;
 
   localparam x_bits = $clog2(DVI_H_ACTIVE+1);
   
-  wire [10:0] beam_x, beam_y;
-  wire [10:0] ibeam_x = DVI_H_ACTIVE - 10'b1 - beam_x;
-  wire [7:0] gs = beam_x > DVI_H_ACTIVE / 2 ?
-                     beam_x[x_bits - 2:x_bits - 9] :
-                     ibeam_x[x_bits - 2:x_bits - 9];
-  wire [7:0] cbr = {8{beam_x[x_bits - 2]}}, cbg = {8{beam_x[x_bits - 3]}},
-             cbb = {8{beam_x[x_bits - 4]}};
+  wire [10:0] cx, cy;
+  wire [10:0] icx = DVI_H_ACTIVE - 10'b1 - cx;
+  wire [7:0] gs = cx > DVI_H_ACTIVE / 2 ?
+                     cx[x_bits - 2:x_bits - 9] :
+                     icx[x_bits - 2:x_bits - 9];
+  wire [7:0] cbr = {8{cx[x_bits - 2]}}, cbg = {8{cx[x_bits - 3]}},
+             cbb = {8{cx[x_bits - 4]}};
   wire [7:0] vr, vg, vb;
-  assign { vr, vg, vb } = beam_y > DVI_V_ACTIVE / 2 ? { cbr, cbg, cbb } : { gs, gs, gs };
+  assign { vr, vg, vb } = cy > DVI_V_ACTIVE / 2 ? { cbr, cbg, cbb } : { gs, gs, gs };
 
-  wire [7:0] vtp_r, vtp_g, vtp_b;
-  wire vga_hsync, vga_vsync, vga_blank;
-  vga
-  #(
-    .c_resolution_x(DVI_H_ACTIVE),
-    .c_hsync_front_porch(DVI_H_FPORCH),
-    .c_hsync_pulse(DVI_H_SYNC),
-    .c_hsync_back_porch(DVI_H_BPORCH),
-    .c_resolution_y(DVI_V_ACTIVE),
-    .c_vsync_front_porch(DVI_V_FPORCH),
-    .c_vsync_pulse(DVI_V_SYNC),
-    .c_vsync_back_porch(DVI_V_BPORCH),
-    .c_bits_x($clog2(DVI_H_ACTIVE+DVI_H_FPORCH+DVI_H_BPORCH+DVI_H_SYNC+1)),
-    .c_bits_y($clog2(DVI_V_ACTIVE+DVI_V_FPORCH+DVI_V_BPORCH+DVI_V_SYNC+1))
-  )
-  vga
-  (
-    .clk_pixel(clk_pixel),
-    .clk_pixel_ena(1'b1),
-    .beam_x(beam_x), .beam_y(beam_y),
-    .vga_r(vtp_r),
-    .vga_g(vtp_g),
-    .vga_b(vtp_b),
-    .vga_hsync(vga_hsync),
-    .vga_vsync(vga_vsync),
-    .vga_blank(vga_blank)
-  );
- // VGA to digital video converter
  wire [7:0] tmds_ddr;
-  wire [9:0] tmds0, tmds1, tmds2;
-`ifndef hdmi_audio
- // DVI (no audio)
- // Note that in the original demo, the serializer in vga2dvid is used.
- // However, to minimize the difference between this and the audio version,
- // I now use the parallel output and serialize it myself below.
- vga2dvid
- #(
-   .c_ddr(1'b1),
-   .c_shift_clock_synchronizer(1'b0) // would 1 work?
- )
- vga2dvid
- (
-   .clk_pixel(clk_pixel),
-   .clk_shift(clk_shift),
-   .in_red(vr),
-   .in_green(vg),
-   .in_blue(vb),
-   .in_hsync(vga_hsync),
-   .in_vsync(vga_vsync),
-   .in_blank(vga_blank),
-   .outp_red(tmds2),
-   .outp_green(tmds1),
-   .outp_blue(tmds0)
- );
-`else
-  // HDMI Audio
-  wire [15:0] aud_l, aud_r;
-//  assign aud_l = {1'b0, {15{~KEY[2]}} & ctr[16:2]}; // W
-//  assign aud_r = {1'b0, {15{~KEY[5]}} & ctr[16:2]}; // E
-  assign aud_l = ctr[16:2]; // W
-  assign aud_r = ctr[15:1]; // E
+  wire [9:0] tmds [3:0];
 
-  // FS=48000 (or 44100 or 32000)
-  // N=128*FS/1000=6144 (default; divisor is 300..1500)
-  // CTS=FREQ*N/(128*FS) = FREQ/1000 (by above formula)
-  av_hdmi #(.FREQ(1000000/dot_scale*dot_clk), .CTS(1000/dot_scale*dot_clk))
-    av_hdmi(.I_CLK_PIXEL(clk_pixel),
-            .I_R(vr), .I_G(vg), .I_B(vb),
-	    .I_BLANK(vga_blank), .I_HSYNC(vga_hsync), .I_VSYNC(vga_vsync),
-	    .I_AUDIO_ENABLE(1'b1),
-	    .I_AUDIO_PCM_L(aud_l), .I_AUDIO_PCM_R(aud_r),
-	    .O_TMDS_PD2(tmds2), .O_TMDS_PD1(tmds1), .O_TMDS_PD0(tmds0));
-`endif
- reg [9:0] tmds0_, tmds1_, tmds2_;
+  reg [15:0] audio_sample_word [1:0];
+  always @(posedge clk125) begin
+    audio_sample_word[0] <= {1'b0, {15{~KEY[2]}} & ctr[16:2]}; // W
+    audio_sample_word[1] <= {1'b0, {15{~KEY[5]}} & ctr[15:1]}; // E
+  end
+  wire clk_audio;
+  reg [11:0] acnt = 0;
+  always @(posedge clk100)
+    acnt <= acnt == (100000/48)-1 ? 0 : acnt + 1;
+  assign clk_audio = acnt[10];
+
+  wire [11:0] frame_width, frame_height, screen_width, screen_height;
+  hdmi #(.VIDEO_ID_CODE(mode_id),
+       .VIDEO_RATE(1000000/dot_scale*dot_clk),
+       .SCREEN_WIDTH(DVI_H_ACTIVE), .SCREEN_HEIGHT(DVI_V_ACTIVE),
+       .FRAME_WIDTH(DVI_H_ACTIVE+DVI_H_FPORCH+DVI_H_SYNC+DVI_H_BPORCH),
+       .FRAME_HEIGHT(DVI_V_ACTIVE+DVI_V_FPORCH+DVI_V_SYNC+DVI_V_BPORCH),
+       .HSYNC_PULSE_START(DVI_H_FPORCH), .HSYNC_PULSE_SIZE(DVI_H_SYNC),
+       .VSYNC_PULSE_START(DVI_V_FPORCH), .VSYNC_PULSE_SIZE(DVI_V_SYNC),
+       .AUDIO_RATE(48000), .AUDIO_BIT_WIDTH(16)) hdmi(
+  .clk_pixel(clk_pixel),
+  .clk_audio(clk_audio),
+  .reset(1'b0),
+  .rgb({vr, vg, vb}),
+  .audio_sample_word(audio_sample_word),
+  .tmds_dat(tmds[2:0]),
+  .tmds_clock(tmds[3]),
+  .cx(cx),
+  .cy(cy),
+  .frame_width(frame_width),
+  .frame_height(frame_height),
+  .screen_width(screen_width),
+  .screen_height(screen_height)
+);
+
+ reg [9:0] tmds_[2:0];
  reg [4:0] pb = 5'b1;
- always @(posedge clk_shift) begin
+ always @(posedge clk_shift)
    pb <= { pb[3:0], pb[4] };
-   tmds0_ <= pb[0] ? tmds0 : { 2'b0, tmds0_[9:2] };
-   tmds1_ <= pb[0] ? tmds1 : { 2'b0, tmds1_[9:2] };
-   tmds2_ <= pb[0] ? tmds2 : { 2'b0, tmds2_[9:2] };
- end
                       // 00 00 01 11 11
  assign tmds_ddr = { |pb[1:0], |pb[2:0],
-                     tmds2_[1:0], tmds1_[1:0], tmds0_[1:0] };
-
-  generate
-    genvar i;
+                     tmds_[2][1:0], tmds_[1][1:0], tmds_[0][1:0] };
+ genvar i;
+ generate
+    for(i = 0; i < 3; i = i + 1)
+      always @(posedge clk_shift)
+        tmds_[i] <= pb[0] ? tmds[i] : { 2'b0, tmds_[i][9:2] };
     for(i = 0; i < 4; i = i + 1) begin
       wire ddr_out;
       ODDR #(.DDR_CLK_EDGE("SAME_EDGE")) ddr (
@@ -562,6 +566,5 @@ localparam DVI_V_POLAR  = 1'b0;
     end
   endgenerate
 `endif
-
 
 endmodule

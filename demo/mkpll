@@ -28,7 +28,7 @@ vpll() {
 # I opened up an issue, but it was ignored.
 for m in "" -m; do
 # 2560x1440@30Hz
-vpll 120.75 603.75
+vpll 120.75 603.75  # 99.38% w/ PLL; 100% w/ MMCM
 # 2560x1440@60Hz
 vpll 241.5 1207.5   # 99.38% w/ PLL; 100% w/ MMCM if I cheat
 # 2560x1440@75Hz
