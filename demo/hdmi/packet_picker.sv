@@ -81,14 +81,14 @@ always_ff @(posedge clk_pixel)
 
 logic sample_buffer_current = 1'b0;
 logic [1:0] samples_remaining = 2'd0;
-logic [`va(24,4*2)] audio_sample_word_buffer [1:0];
+logic [`va(24,2)] audio_sample_word_buffer [1:0] [3:0];
 logic [`va(AUDIO_BIT_WIDTH,2)] audio_sample_word_transfer_mux;
 always_comb
 begin
     if (audio_sample_word_transfer_control_synchronizer_chain[0] ^ audio_sample_word_transfer_control_synchronizer_chain[1])
         audio_sample_word_transfer_mux = audio_sample_word_transfer;
     else
-        audio_sample_word_transfer_mux = {audio_sample_word_buffer[sample_buffer_current][`vais(24,samples_remaining*2+1,23,(24-AUDIO_BIT_WIDTH))], audio_sample_word_buffer[sample_buffer_current][`vais(24,samples_remaining*2+1,23,(24-AUDIO_BIT_WIDTH))]};
+        audio_sample_word_transfer_mux = {audio_sample_word_buffer[sample_buffer_current][samples_remaining][`vais(24,1,23,(24-AUDIO_BIT_WIDTH))], audio_sample_word_buffer[sample_buffer_current][samples_remaining][`vais(24,0,23,(24-AUDIO_BIT_WIDTH))]};
 end
 
 logic sample_buffer_used = 1'b0;
@@ -101,8 +101,8 @@ begin
 
     if (audio_sample_word_transfer_control_synchronizer_chain[0] ^ audio_sample_word_transfer_control_synchronizer_chain[1])
     begin
-        audio_sample_word_buffer[sample_buffer_current][`vai(24,samples_remaining*2+0)] <=  24'(audio_sample_word_transfer_mux[`vai(AUDIO_BIT_WIDTH,0)])<<(24-AUDIO_BIT_WIDTH);
-        audio_sample_word_buffer[sample_buffer_current][`vai(24,samples_remaining*2+1)] <=  24'(audio_sample_word_transfer_mux[`vai(AUDIO_BIT_WIDTH,1)])<<(24-AUDIO_BIT_WIDTH);
+        audio_sample_word_buffer[sample_buffer_current][samples_remaining][`vai(24,0)] <=  24'(audio_sample_word_transfer_mux[`vai(AUDIO_BIT_WIDTH,0)])<<(24-AUDIO_BIT_WIDTH);
+        audio_sample_word_buffer[sample_buffer_current][samples_remaining][`vai(24,1)] <=  24'(audio_sample_word_transfer_mux[`vai(AUDIO_BIT_WIDTH,1)])<<(24-AUDIO_BIT_WIDTH);
         if (samples_remaining == 2'd3)
         begin
             samples_remaining <= 2'd0;
@@ -174,7 +174,10 @@ begin
         else if (sample_buffer_ready)
         begin
             packet_type <= 8'd2;
-            audio_sample_word_packet <= audio_sample_word_buffer[!sample_buffer_current];
+            audio_sample_word_packet <= {audio_sample_word_buffer[!sample_buffer_current][3],
+	                                 audio_sample_word_buffer[!sample_buffer_current][2],
+					 audio_sample_word_buffer[!sample_buffer_current][1],
+					 audio_sample_word_buffer[!sample_buffer_current][0]};
             audio_sample_word_present_packet <= 4'b1111;
             sample_buffer_used <= 1'b1;
         end

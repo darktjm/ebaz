@@ -86,6 +86,7 @@
 
 `default_nettype none
 `include "ebaz-eth.v" // also includes zynq-ps7.v
+`include "ysv-supt.v"
 
 module top(
   output wire LED_RED, LED_GREEN, /* active low */
@@ -508,7 +509,7 @@ localparam DVI_V_POLAR  = 1'b0;
   assign { vr, vg, vb } = cy > DVI_V_ACTIVE / 2 ? { cbr, cbg, cbb } : { gs, gs, gs };
 
  wire [7:0] tmds_ddr;
-  wire [9:0] tmds [3:0];
+  wire [`va(10,4)] tmds;
 
   reg [15:0] audio_sample_word [1:0];
   always @(posedge clk125) begin
@@ -534,9 +535,9 @@ localparam DVI_V_POLAR  = 1'b0;
   .clk_audio(clk_audio),
   .reset(1'b0),
   .rgb({vr, vg, vb}),
-  .audio_sample_word(audio_sample_word),
-  .tmds_dat(tmds[2:0]),
-  .tmds_clock(tmds[3]),
+  .audio_sample_word({audio_sample_word[1], audio_sample_word[0]}),
+  .tmds_dat(tmds[`vas(10,2,0)]),
+  .tmds_clock(tmds[`vai(10,3)]),
   .cx(cx),
   .cy(cy),
   .frame_width(frame_width),
@@ -556,7 +557,7 @@ localparam DVI_V_POLAR  = 1'b0;
  generate
     for(i = 0; i < 3; i = i + 1)
       always @(posedge clk_shift)
-        tmds_[i] <= pb[0] ? tmds[i] : { 2'b0, tmds_[i][9:2] };
+        tmds_[i] <= pb[0] ? tmds[`vai(10,i)] : { 2'b0, tmds_[i][9:2] };
     for(i = 0; i < 4; i = i + 1) begin
       wire ddr_out;
       ODDR #(.DDR_CLK_EDGE("SAME_EDGE")) ddr (
