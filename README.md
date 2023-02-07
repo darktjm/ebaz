@@ -25,47 +25,48 @@ Other files of note:
     resources.  Naturally, to use this, you will either need to
     ensure constraint errors are just warnings, or hand-edit it
     for every project.  I don't like hand-editing stuff that
-    should be "standard", so I choose the former option.  This
-    requires patching f4pga (optcstr.patch).  Good luck.
+    should be "standard", so I choose the former option.
 
     Note that this does not include timing constraints.
 
     I guess placing comments after lines doesn't work as I would
     expect (maybe that's not legal TCL?), because Vivado gives
-    warnings about it.  Just ignore them.
+    warnings about it.  I used to say "just ignore them", but I've
+    gone ahead and put the comments on the next line.
 
-  - `mkebaz` - the script I currently use to compile, using f4pga.
-    I hate f4pga's use of the Python ecosystem (Python itself is
-    awful, but worse yet, pip and conda replace sane package
-    management with a joke of a mess), but it's the only thing I
-    can currently use to create binaries, without resorting to
-    Vivado.  I separated the conda stuff into `f4pga.sh`, which
-    mkebaz sources from `~/bin`.  Change the path if you actually
-    use this (which I don't recommend, because it's for me, and I
-    haven't really cleaned it up yet).  One major deficiency is
-    that it tries to skip already-done steps, but doesn't really
-    have sufficient knowledge of what might require redoing steps.
-    Best to just wipe out the build directory every time before
-    use.
-  
-    For example, to build the ethernet example into `build-ebaz/ebaz.bit`
-    (derived from the xdc name):
->     mkebaz -t top eth.v pll.v ebaz.xdc
+  - `fpgasynth` - this is my generic wrapper program for converting
+    source to bitstreams.  Originally, I only wanted to support `yosys`
+    and `nextpnr` with Verilog source.  As I was playing with open
+    cores, I added VHDL support.  In generall, as my needs grew, so did
+    the script.  It's become unmanageable, so I will eventually
+    rewrite it.  Maybe once I finally get some basics working right.
+    This replaces my old `mkebaz` script now, as well.  For Xilinx, it
+    supports Vivado and `nextpnr-xilinx` (don't know what version; I just
+    keep git up-to-date for now).  I used to support f4pga, but since it
+    produced bad results (and didn't support everything it should to begin
+    with) in my tests, I have removed it entirely from my system.  Since
+    `nextpnr-xilinx` also can't produce usable output most of the
+    time, I made Vivado the default, and recommmend using it unless you're
+    feeling masochistic.
 
-  - `fpgasynth` - this is my generic wrapper program around the
-    yosys+nextpnr toolchain.  It really only works for Lattice
-    parts, because the Xilinx and Gowin tools are missing
-    important primitives.  In fact, I was so frustrated by the
-    lack of support for Gowin parts, that I added `gw_tcl` support
-    to `fpgasynth`.  I may eventually merge in `f4pga` support
-    from `mkebaz` or even `Vivado -mode tcl` (if I ever find
-    usable documentation) if I continue to run into issues in the
-    free toolchains.  It's important to note that if you do use
-    this for Gowin, I always wrap the Gowin binaries with my `nonet`
-    program (see the <https://bitbucket.org/darktjm/gamesup>).  I do
-    the same with Vivado, when I actually run it.  I suspect this is
-    the reason 2022.1 crashes so much.  Sorry, no phoning home for
-    you.
+    There is on-line help (`-h` option) and an example.  Since I'm
+    going to rewrite it, and I really ought to distribute it as a
+    separate project, rather than part of this one, that will have to
+    do for documentation.  I have actually left out `mk_testrig.sh`
+    and `testrig.v` (used while I was trying to see if open cores
+    would compile at all with `yosys`+`nextpnr`) and `fa2add.jq`,
+    which I was using to experiment with adding carry chains to
+    manually implemented adders (part of my original purpose for
+    getting into FPGAs was to allow drawing of schematics to produce
+    circuits, including manual implementations of adders).
+
+    It's important to note that I use wrapper scripts for the
+    commercial tools which at least use `nonet` (see
+    <https://bitbucket.org/darktjm/gamesup>) to disable phoning
+    home (or any other network access).  I suspect this is the
+    reason that Vivado 2022 crashes so much (no testing for
+    behavior on failure to access the network).  I won't even try
+    without:  sorry, no phoning home for you.
 
   - `xc7pll.c` - source for a simple PLL generator.  I used
     Verilog to implement this for the Gowin FPGAs, but the code
@@ -87,13 +88,14 @@ Other files of note:
     component.  This macro library does not work properly in
     Vivado.  I moved the raw semicolon out of the macro
     definitions, which makes it at least work in System Verilog
-    mode on 2022.1, but I can't get 2022.1 to do anything useful
-    on my machine without crashing, so I use 2017.2, which doesn't
-    like it even with the deferred semicolon and System Verilog
-    mode.  A workaround is to use a preprocessor like
-    `verilator -P -E` (I don't know yet how to set it up to always use
-    this, so for my tests, I just generate my top-level this way by
-    hand).
+    mode on 2022.2.  2022.2 crashes a lot if I wrap it in `nonet`, so
+    I've disabled the wrapper for now.  It doesn't appear to call home,
+    anyway, so I'm not even sure why it crashes.  2017.2 does not crash,
+    but it doesn't like the macros no matter what.  A workaround, which
+    I used to do in my scripts, is to use a preprocessor like
+    `verilator -P -E`.  I initially implemented automatic preprocessing
+    in `fpgasynth`, but backed out because I really don't like
+    managing files this way. 
 
   - `ebaz-eth.v` - macro library to easily add raw ethernet
     forwarding.  Depends on `zynq-ps7.v`.  `eth.v` is a sample
@@ -103,16 +105,20 @@ Other files of note:
     maybe because my board has the oscillator, so I haven't really
     tested if it works.
 
+  - `ysv-supt.v` - macro library to assist in one of the issues porting
+    SystemVerilog code to yosys-native (rather than the Surelog
+    plugin).  See `demo/hdmi` for example usage.
+
   - `demo` - against my better judgement, I have included my
     simple demo which exercises the components I want: LEDs,
-    pushbuttons, speaker, LCD, USB UART (echos @115200), ethernet
-    passthrough, and HDMI.  There seems to be an issue with the
-    LCD backlight, even though another demo I have (the ulx3s-misc
-    collatz example ported to the ebaz) seems to work, at least in
-    that regard.  Parts were taken from other projects which were
-    independently verified as working, to eliminate possible
-    errors on my part (but I still managed to sneak an error into
-    the uart code):
+    pushbuttons, expansion connector (H4), speaker, LCD, USB UART
+    (echos @115200), ethernet passthrough, and HDMI.  There seems to
+    be an issue with the LCD backlight, even though another demo I
+    have (the ulx3s-misc collatz example ported to the ebaz) seems to
+    work, at least in that regard.  Parts were taken from other
+    projects which were independently verified as working, to
+    eliminate possible errors on my part (but I still managed to sneak
+    an error into the uart code):
       - LCD support: <https://github.com/emard/ulx3s-misc> spi_display example
       - HDMI with audio support: <https://github.com/hdl-util/hdmi> with
         some modifications by me.  It's System Verilog, not supported by
@@ -124,14 +130,15 @@ Other files of note:
     These include minor patches to fix compilation issues with Vivado
     and/or f4pga.
 
-During HDMI debugging, I also verified the H4 pins work as expected. 
 I have successfully booted from SD card (instead of moving the
 resistor, I patched a resistor to a non-connected pin on the JTAG
 header, and use a jumper from that pin to either VCC or GND pins on
 the same header to switch between boot modes).  I currently prefer to
 just boot from flash - see
 <https://github.com/xjtuecho/EBAZ4205#reset-the-root-password-of-built-in-linux>
-for decent instructions on how to boot from the pre-loaded flash.
+for decent instructions on how to boot from the pre-loaded flash.  In
+summary, disable the bitminer software and set up the network the way
+you like it.
 
 Part of the reason I prefer the default flash is that the kernel has
 the old `/dev/xcdevcfg` device for programming the FPGA:
@@ -151,9 +158,70 @@ from Vivado now that I've finally given in and installed it.
 My grumbling; feel free to ignore
 ---------------------------------
 
+Probably my biggest disapppointment is that I had to resort to
+commercial tools for this (and Gowin support).  I was under the
+impression that the free tools were at least mostly ready; it appears
+that I was misled.  It really only works for Lattice parts (at least
+the ones I'm interested in).  In the case of Gowin, it is missing
+critically important primitives and support for non-primitive on-board
+hardware; this was the first one I replaced with the commercial tool
+in `fpgasynth`.  For Xilinx, I was able to initially work around the
+lack of important primitives in f4pga, but even then in some tests
+Vivado produces perfect working bitstreams where f4pga produces mostly
+garbage.  At least both commercial tools have Linux binaries, so I
+don't have to additionally deal with wine issues.  At least the
+free-of-charge Gowin toolchain (not the educational version) supports
+all devices and all device features.  The free-of-charge Xilinx
+toolchain supports the xc7z010 on the EBAZ, but doesn't support most
+other parts (in particular, there are now cheap xc7k325t boards that
+aren't supported).  I guess they don't want to sell those parts to
+hobbyists, who don't want to invest a ton of money into just the
+stupid software (and can't write their own software because the modern
+way is to not ever document anything: you're lucky if publicly
+available datasheets include a pinout and DC/AC characteristics of
+sorts).  Both vendors like to force you to use proprietary IP blocks
+(what I call "secret sauce"), which I will continue to avoid like the
+plague that they are, until of course I find a need for one and have
+to capitulate yet again.
+
+I despise Python with the passion of a thoused fiery suns.  The
+language (uncompilable, whitespace as a control structure, other
+issues common with interprted languages, like significant file names
+and forced file structuring and simple integrity checks impossible to
+do until run-time) and its interpreter(s) (consumes all available
+resources if possible), but the ecosystem is even worse.  Instead of
+providing a stable environment, every Python program has to have an
+entire Python distribution attached.  No single binary, but a whole
+tree for every Python program.  Python "environments" managed by
+crappy package managers (pip and conda) which bypass the system
+package manager to do their own thing, in your home directory (where
+installed software does not belong).  This all seems like a poor joke.
+F4pga installs 60,000 files, consuming 3GB.  Entire usable operating
+systems with user space are smaller and better managed.  These
+comments apply both to f4pga in particular and the various reverse
+engineering projects, as well.  I have no idea how Python ever got so
+popular, but it's become the new Visual BASIC. Popular, but impossible
+to actually write good code in.
+
+"F4PGA: The GCC of FPGAs".  Right.  Not only is it not a standalone
+project (all components except for the crappy Python glue code come
+from elsewhere, although the yosys plugins are essentially part of
+f4pga as well), but it's extremely poorly documented (an example can
+supplement, but not replace actual documentation, and forcing people
+to use your poorly written makefiles is inadequate at best) with
+frequent changes and no view whatsoever towards backwards
+compatibility.  Ever hear the expression "Bugs are just undocumented
+features"?  Works both ways.  All undocumented features are bugs.
+Learn to write documentation before you churn out code.  Pretty much
+what I expect of modern open source projects, rather than the standard
+GCC was based on.  I certainly hope it doesn't become the (only)
+standard open source toolkit for FPGAs.  Or if it does, it becomes
+better somehow (I doubt it will drop Python or its completely broken
+dependency management systems any time soon, though).
+
 Some bugs in the free tools have been unaddressed for years now.  Will
 the free toolchain ever actually be ready for prime time?  I don't
-really care for `vpr` as packaged by `f4pga`, either, given that its
+really care for `vpr` as packaged by f4pga, either, given that its
 reports are useless and it takes forever (likely due to
 <https://github.com/f4pga/f4pga-arch-defs/issues/1863>, mostly).  No
 `MMCME2_ADV` or `BUFR` or `PLLE2_BASE` or `MMCME2_BASE` and who knows
@@ -165,56 +233,33 @@ would be no clocks (or ethernet passthrough, which makes programming
 easier).
 
 Unfotunately, even though `nextpnr-xilinx` is much faster and produces
-better reports, it has many more missing primitives (maybe because I
-built it incorrectly, but it's hard for me to tell either way). I do
-not see f4pga going anywhere I want to follow, so if I do put effort
-into making a free tool work better, it will be nextpnr-xilinx.
-Significantly less than 60k/3GB files, and at least far less Python
-(seems impossible to get away from it entirely without rewriting
-everything from scratch).
+better reports, it has more missing primitives and can't even compile
+my simple HDMI test (maybe because I built it incorrectly, but it's
+hard for me to tell either way).  I do not see f4pga going anywhere I
+want to follow, so if I do put effort into making a free tool work
+better, it will be `nextpnr-xilinx`.  Significantly less than 60k/3GB
+files, and at least far less Python (seems impossible to get away from
+it entirely without rewriting everything from scratch).
 
 Given my frustration with how f4pga is structured and the lack of
 support for important things (no devices other than what the free
 version of Vivado supports, anyway, but with fewer components, longer
 compile times, and just as little control over what happens since
 managing 60k/3GB installed files is bullshit), I will likely never use
-f4pga again.  The only development that might change my mind is
-xc7k325t support, which likely won't happen.  The only artifact I have
-preserved from my previous use of f4pga is a small patch to reduce the
-embedded device name in the binary so the ebaz default kernel will
-load it (xc_fasm.patch).  I already mentioned my optional constraints
-patch above.  I recall spending a lot of time in the install dir, so I
-probably made other changes as well, but I don't remember and I don't
-care any more.  I've now chucked them all in favor of a fresh install.
-
-"F4PGA: The GCC of FPGAs".  Right.  Not only is it not a standalone
-project (all components except for the crappy Python glue code come
-from elsewhere), but it's extremely poorly documented (an example can
-supplement, but not replace actual documentation) with frequent
-changes and no view whatsoever towards backwards compatibility.  Ever
-hear the expression "Bugs are just undocumented features"?  Works both
-ways.  All undocumented features are bugs.  Learn to write
-documentation before you churn out code.  Pretty much what I expect of
-modern open source projects, rather than the standard GCC was based
-on.  I certainly hope it doesn't become the (only) standard open
-source toolkit for FPGAs.  Or if it does, it becomes better somehow (I
-doubt it will drop Python or its completely broken dependency
-management systems any time soon, though).
-
-Once again, like with the Gowin parts, I have been fooled into
-thinking things were ready, when they weren't.  At least with Gowin I
-got a mstly hassle-free full prorprietary Linux toolchain free of
-charge; AMD/Xilinx makes no similar offers.  Their proprietary
-toolchain has more hassle (less usable documentation, for one) and
-only supports a subset of devices (e.g. no Kintex parts at all, even
-though Kintex dev boards are now pretty cheap comparitively).
+f4pga again.  The only development that might change my mind is full
+xc7k325t support and MMCME2 for the xc7z010, which likely won't
+happen.  I have removed all artifacts of f4pga from this project (but
+obviously not all mentions), although you can get them from previous
+commits if you insist.
 
 I might abandon the Xilinx FPGA line in general anyway, since it's
 steeped in the same bullshit that contributed to my abandonment of the
 electronics hobby years ago, such as requiring essentially a club
 membership fee in order to use components (lack of documentation
 combined with no free-of-charge usable tools to partially compensate,
-except for "selected" components, such as no Kintex suppoprt at all).
+except for "selected" components, such as no Kintex support at all).
+Plus even more bullshit, like the xc7a35t articficial limitations in the
+commercial toolchain (i.e., it's really an xc7a50t hardware-wise).
 
 License Information
 -------------------

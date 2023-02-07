@@ -342,7 +342,9 @@ int main(int argc, const char **argv)
 	 "\t// The following parameters are passed down to the PLL primitive:\n"
 	 "parameter\n"
 	 "\t// Insufficiently documented for direct support\n"
-	 "\tBANDWIDTH = \"OPTIMIZED\", COMPENSATION = \"ZHOLD\",\n"
+	 "\t// Default for COMPENSATION is actually ZHOLD\n"
+	 "\t// but INTERNAL should be fine/appropriate\n"
+	 "\tBANDWIDTH = \"OPTIMIZED\", COMPENSATION = \"INTERNAL\",\n"
 	 "\tSTARTUP_WAIT = \"FALSE\",\n"
 	 "\t// Phase and duty cycle not directly supported");
     for(int i = 0; i < 7; i++) {

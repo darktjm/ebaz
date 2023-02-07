@@ -5,21 +5,27 @@ set -o posix
 # TODO:
 # - make at least 1 nexus binary (requires constraints on all pins)
 #   (I already did this once, but I need to verify it still works)
-# - maybe support f4pga (requires custom install system)
+# - support use of vhd2vl instead of ghdl
 # - support parallel compile w/ gowin (i.e. non-shared impl dir)
 # - support anlogic via prjtang (not yet usable) or Tang Dynasty (undocumented)
 # - support cyclone 5 (prjmistral) (about as bad as gowin/apicula)
+# - given how bad xilinx/gowin are, maybe look into Lattice Diamond
 # - document just how broken nextpnr-xilinx really is
-# - support xilinx via f4pga (still broken, though, e.g. no k325t, no MMCM)
-# - support xilinx via Vivado (still won't support k325t, though)
-# - support iverilog as target
-# - get rid of .bin as default ext. openFPGALoader doesn't like it.
-# - support partial execution/convert to makefile(-like)
 # - document known issues w/ yosys (e.g. no tdp RAM w/ shared clock, occasional
 #   assertion crashes, no BSRAM with Gowin's recommended generic Verilog)
+# - support iverilog as target
+# - support verilator as target (include C files)
+# - get rid of .bin as default ext. openFPGALoader doesn't like it.
+# - support partial execution/convert to makefile(-like)
+# - rewrite in C/C++, since it's no longer a short wrapper script around a
+#   just a few tools
 # - separate README
 #
 # Things I won't do:
+#  - support f4pga.  I hate conda and pip.  Even though it's slightly
+#    less broken in some ways than nextpnr-xilinx, it's still broken.
+#    Fixes should go into nextpnr-xilinx.  Plain nextpnr works fine with
+#    Lattice parts, so I see no reason to use f4pga there, either.
 #  - support machxo2 (too few LUTS, too rare/expensive to be of use)
 #  - support eoss3 (too few LUTs to be of use; probably needs f4pga)
 
@@ -53,9 +59,12 @@ mk_tstrig=$HOME/fpga/lib/mk_testrig.sh
 doadd=
 keep=
 opref=
+odir=
 sysv=
 ysysv=
 defs=()
+use_yosys=
+libpath=()
 
 addu() {
   local arr e x g out="$1"
@@ -71,24 +80,27 @@ addu() {
   eval $out="(\"\${arr[@]}\")"
 }
 
+alias sarg='case "$1" in -??*) arg="${1#-?}" ;; *) shift; arg="$1"; esac'
+
 while [ $# -gt 0 ]; do
   case "$1" in
-    -a) addu arch ecp5 ice40 gowin ;;
+    -a) addu arch ecp5 ice40 gowin xilinx ;;
     -i) addu arch ice40 ;;
-    -I) addu arch ice40; shift; addu icedev "$1" ;;
+    -I*) addu arch ice40; sarg; addu icedev "$arg" ;;
     -e) addu arch ecp5 ;;
-    -E) addu arch ecp5; shift; addu ecp5dev "$1" ;;
+    -E*) addu arch ecp5; sarg; addu ecp5dev "$arg" ;;
     -n) addu arch nexus ;;
-    -N) addu arch nexus; shift; addu nexusdev "$1" ;;
+    -N*) addu arch nexus; sarg; addu nexusdev "$arg" ;;
     -g) addu arch gowin ;;
-    -G) addu arch gowin; shift; addu gwdev "$1" ;;
+    -G*) addu arch gowin; sarg; addu gwdev "$arg" ;;
     -x) addu arch xilinx ;;
-    -X) addu arch xilinx; shift; addu xdev "$1" ;;
-    -t) shift; top="$1" ;;
+    -X*) addu arch xilinx; sarg; addu xdev "$arg" ;;
+    -t*) sarg; top="$arg" ;;
     -T) tr=y ;;
     -d) delay=y ;;
     -s) sysv=system ;;
     -sv) ysysv=-sv ;;
+    -L*) sarg; libpath=("${libpath[@]}" "$arg") ;;
     -v) vhdl=y ;;
     -V) vhdl=y; while :; do
           shift
@@ -99,21 +111,22 @@ while [ $# -gt 0 ]; do
 	  esac
 	  break
 	done ;;
-    -D) shift; defs=("${defs[@]}" "$1") ;;
-    -D*)       defs=("${defs[@]}" "${1#-D}") ;;
+    -D*) sarg; defs=("${defs[@]}" "$arg") ;;
     -q) yargs=("${yargs[@]}" -q) ;;
-    -o) shift; opref="$1" ;;
+    -o*) sarg; opref="$arg" ;;
     -A) doadd=y ;;
     -S) schem=y ;;
     -k) keep=y ;;
+    -y) use_yosys=y ;;
     -h|-*) cat <<EOF; exit 0 ;;
 Usage: $0 [flags] srcfile ...
 
 flags:
   -q       Quieten yosys a bit
   -o <prf> Prefix output files with given prefix
-           This excludes some side effects produced by ghdl and Gowin tools.
+           This excludes some side effects produced by ghdl and vendor tools.
   -D <def> Add parameter definition for reading Verilog
+  -L <dir> Add directory to search path for includes, constraints
   -v       All input files are VHDL instead of Verilog
   -V .. -- Same as -v, but add .. to ghdl argument list
   -s       All input files are System Verilog not supported w/o yosys plugin
@@ -124,7 +137,7 @@ flags:
   -R <scr> Enable generation of test rig with <scr>
   -d       Enable generation of delay reports
   -S       Enable generation of schematics from yosys/nextpnr
-  -a       Add all supported targets: ecp5 ice40 gowin
+  -a       Add all supported targets: ecp5 ice40 gowin xilinx
   -g       Add gowin
   -G <dev> Add gowin w/ given device
   -i       Add ice40
@@ -134,7 +147,10 @@ flags:
   -n       Add nexus
   -N <dev> Add nexus w/ given device
   -k       Keep going on yosys errors
+  -y       Use yosys+nextpnr instead of vendor tool if applicable (gowin,xilinx)
   -h       Help
+Any option -<x> <parm> can be given as -<x><parm> as well.
+
 Default ghdl/VHDL args are --std=08 --ieee=synopsys
 
 For ice40 and ecp5, use the nextpnr argument for the device.  If no -- is
@@ -171,14 +187,27 @@ setdo() {
     *"#"*) do="${d#*\#}"; d="${d%%\#*}" ;;
     *) do="$opref" ;;
   esac
+  case "$do" in
+    */*) odir="${do%/*}"; do="${do##*/}" ;;
+    *)   odir="build-$do" ;;
+  esac
+  mkdir -p "$odir" || exit 1
+  cd "$odir"
 }
-  
 
-if [ -z "$vhdl" ]; then
-  for x; do
-    case "$x" in *.vhd*) vhdl=y ;; esac
-  done
-fi
+wd="$(pwd)"
+f=()
+vf=() # includes .sv files for now
+vhdf=()
+for x; do
+  case "$x" in /*) ;; *) x="$wd/$x";; esac
+  f=("${f[@]}" "$x")
+  case "$x" in
+      *.[vV][hH][dD]*) vhdl=y; vhdf=("${vhdf[@]}" "$x") ;;
+      *.[sS][vV]) vf=("${vf[@]}" "$x"); test -z "$sysv$ysysv" && ysysv=-sv ;;
+      *) vf=("${vf[@]}" "$x") ;;
+  esac
+done
 
 test -n "$vhdl" && yargs=("${yargs[@]}" -m ghdl)
 test -n "$sysv" && yargs=("${yargs[@]}" -m systemverilog)
@@ -196,18 +225,26 @@ docmd() {
   eval '"$@"' "${ofile:+>$ofile}"
 }
 
-test $# -eq 0 && exit 1
+test ${#f[@]} -eq 0 && exit 1
+
+libpatha=()
+for x in "${libpath[@]}"; do
+  case "$x" in
+    /*) libpatha=("${libpatha[@]}" "$x") ;;
+    *)  libpatha=("${libpatha[@]}" "$wd/$x") ;;
+  esac
+done
 
 if [ -n "$vhdl" ]; then
  rm -f work-obj??.cf
- docmd ghdl -i "${vhdl_args[@]}" "$@" || exit $?
+ docmd ghdl -i "${vhdl_args[@]}" "${vhdf[@]}" || exit $?
 # docmd ghdl -a "${vhdl_args[@]}"  $(sed -n -e 's/^file \. "\([^"]*\)".*/\1/;T;p' work-obj??.cf | tac)
  cmd="ghdl --latches ${vhdl_args[*]} $* -e $top"  # FIXME:  quote properly
  top=
 else
- # should I support -vlog95/-vlog2k/-sv?  maybe also other options, like -D?
+ # should I support -vlog95/-vlog2k?  maybe also other options, like -D?
  # should I support pre-run verification w/ iverilog for better error msgs?
- cmd="read_${sysv}verilog ${ysysv} ${sysv:+${defargs[*]}} $*"  # FIXME:  quote properly
+ cmd="read_${sysv}verilog ${ysysv} ${libpatha[*]/#/-I} ${sysv:+${defargs[*]}} $*"  # FIXME:  quote properly
 fi
 do_yosys() {
 (
@@ -282,9 +319,36 @@ eval $(echo "$ports" | jq -r 'group_by(.direction)|
 # Then again, Tang Primer has a BG256 package w/ very few unused pins
 # test $((input+output)) -gt 30 && tr=y
 test -n "$tr" && . "$mk_tstrig"
-do_yosys
 for a in "${arch[@]}"; do
-  o=$opref$a
+  case "$a" in
+    gowin|xilinx) ;;
+    *) use_yosys=y ;;
+  esac
+done
+test -n "$use_yosys" && do_yosys
+find_lib() {
+  local ret= l
+  for l in . "$wd" "${libpatha[@]}"; do
+    local f="$l/$1"
+    test -z "$ret" -a -f "$f" && ret="$f"
+  done
+  case "$ret" in ./*) ret="`pwd`/$ret";; esac
+  printf %s "$ret"
+}
+find_extra() {
+  local ext="$1" ret= p f
+  shift
+  ret="$(find_lib "$do.$ext")"
+  for p in "" "$do"; do
+    for f; do
+      local n="$(find_lib "$p$f.$ext")"
+      test -n "$n" && ret="$n"
+    done
+  done
+  printf %s "$ret"
+}
+for a in "${arch[@]}"; do
+  o=${opref##*/}$a
   cmd=(nextpnr-$a --timing-allow-fail --json ${o}.json ${delay:+--sdf ${o}.sdf --report ${o}-report.json} --write ${o}-pnr.json --ignore-loops)
   case "$a" in
     gowin)
@@ -300,17 +364,11 @@ for a in "${arch[@]}"; do
 	  [^G]*)              d=GW1N-LV${d%[kK]}QN48C6/I5 ;; # tang nano original
 	  *) ;;
 	esac
-        cst=
-	test -f "$do".cst && cst="$do.cst"
 	rd="${d%%??/*}"
-	for p in "" "$do"; do
-	  for f in $a{,-{"$od","$rd"}} "$rd"; do
-	    test -f "$p$f".cst && cst="$p$f".cst
-	  done
-	done
+        cst="$(find_extra cst $a{,-{"$od","$rd"}})"
         #######################
 	# Actually, forget apicula and its spinoffs.  It isn't ready for
-	# prime time.  Just use the Gowin toolset.  It's free.
+	# prime time.  Just use the Gowin toolset.  It's free of charge.
         # Missing primitives in apicula[/nextpnr-gowin/yosys' synth_gown]:
 	# [note: some of these may be not be real primitives on-device.
 	#  in particular, 36x36 mul isn't, and DL* might not be]
@@ -353,56 +411,59 @@ for a in "${arch[@]}"; do
 	# so they may not be available for purchase.  The GW2AN-X
 	# series are not even supported by gowin_unpack due to malformed
 	# (according to apicula) data.
-	if [ "${#defs[@]}" -gt 0 ]; then
-	  deffile=/tmp/def$$.v
-	  addtrap "rm -f $deffile"
-	  for x in "${defs[@]}"; do
-	    echo "\`define ${x%%=*} ${x#*=}"
-	  done >$deffile
-	else
-	  deffile=
+	if [ -z "$use_yosys" ]; then
+	  if [ "${#defs[@]}" -gt 0 ]; then
+	    deffile=/tmp/def$$.v
+	    addtrap "rm -f $deffile"
+	    for x in "${defs[@]}"; do
+	      echo "\`define ${x%%=*} ${x#*=}"
+	    done >$deffile
+	  else
+	    deffile=
+	  fi
+	  ob="${do%-*}"
+	  (
+	    echo "set_device -name [regsub {(^[^-]*-)[^0-9]*([0-9]*([BCDZ]|P5)?).*} {$d} {\1\2}]" "{$d}"
+	    test -n "$top" && echo "set_option -top_module {$top}"
+	    for x in gen_{sdf,text_timing_rpt} print_all_synthesis_warning \
+		     use_{done,ready,mspi,sspi,i2c,reconfign}_as_gpio \
+	             show_all_warn bit_compress bit_incl_bsram_init hotboot; do
+#		     use_{reconfign,jtag}_as_gpio \
+	      echo "set_option -$x 1"
+	    done
+	    echo "set_option -bit_security 0"
+	    echo "set_option -cst_warn_to_error 0"
+	    test -n "$ob" && echo "set_option -output_base_name {$ob}"
+	    test -n "$sysv$ysysv" && echo "set_option -verilog_std sysv2017"
+	    test -n "$vhdl" && echo "set_option -vhdl_std vhd2008"
+	    test -n "$deffile" && echo "add_file $deffile"
+	    for x in "${f[@]}"; do
+	      case "$x" in
+	         */prim_syn.v|*/gowin_prim.v) ;;
+	         *) echo "add_file {$x}" ;;
+	       esac
+	    done
+	    test -n "$cst" && echo "add_file {$cst}"
+	    echo "run all"
+          ) >${do}gowin.tcl
+	  ob="${ob:-project}"
+	  #rm -rf impl
+	  # Note: gw_sh on my system wraps it in nonet (no calling home for you!)
+	  docmd $GOWINHOME/IDE/bin/gw_sh ${do}gowin.tcl | \
+	    sed -E 's/^((ERROR|WARN|NOTE)[^:]*: )(.*)\("([^"]*)"(:[0-9]*)\)$/\4\5:\1\3/'
+	  test -f impl/pnr/"$ob".fs || continue
+	  find impl -type f -exec chmod -x {} \;
+	  of="${cst%.cst}"; of="${of##*/}"; of="${of:-$a}"
+	  of="${do}${of#$do}"
+	  for x in fs rpt.txt; do
+	    /bin/mv -f impl/pnr/"$ob.$x" "$of.$x"
+	  done
+	  cat "$of".rpt.txt
+	  continue
 	fi
-	ob="${do##*/}"; ob="${ob%-}"
-	(
-	  echo "set_device -name [regsub {(^[^-]*-)[^0-9]*([0-9]*([BCDZ]|P5)?).*} {$d} {\1\2}]" "{$d}"
-	  test -n "$top" && echo "set_option -top_module {$top}"
-	  for x in gen_{sdf,text_timing_rpt} print_all_synthesis_warning \
-		   use_{done,ready,mspi,sspi,i2c,reconfign}_as_gpio \
-	           show_all_warn bit_compress bit_incl_bsram_init hotboot; do
-#		   use_{reconfign,jtag}_as_gpio \
-	    echo "set_option -$x 1"
-	  done
-	  echo "set_option -bit_security 0"
-	  echo "set_option -cst_warn_to_error 0"
-	  test -n "$ob" && echo "set_option -output_base_name {$ob}"
-	  test -n "$sysv$ysysv" && echo "set_option -verilog_std sysv2017"
-	  test -n "$vhdl" && echo "set_option -vhdl_std vhd2008"
-	  test -n "$deffile" && echo "add_file $deffile"
-	  for x; do
-	    case "$x" in
-	       */prim_syn.v|*/gowin_prim.v) ;;
-	       *) echo "add_file {$x}" ;;
-	     esac
-	  done
-	  test -n "$cst" && echo "add_file {$cst}"
-	  echo "run all"
-        ) >${do}gowin.tcl
-	ob="${ob:-project}"
-	#rm -rf impl
-	docmd $GOWINHOME/IDE/bin/gw_sh ${do}gowin.tcl | \
-	  sed -E 's/^((ERROR|WARN|NOTE)[^:]*: )(.*)\("([^"]*)"(:[0-9]*)\)$/\4\5:\1\3/'
-	test -f impl/pnr/"$ob".fs || continue
-	find impl -type f -exec chmod -x {} \;
-	of="${cst%.cst}"; of="${of:-$a}"
-	of="${do}${of#$do}"
-	for x in fs rpt.txt; do
-	  /bin/mv -f impl/pnr/"$ob.$x" "$of.$x"
-	done
-	cat "$of".rpt.txt
-	continue
         #######################
 	docmd "${cmd[@]}" --device "$d" ${cst:+--cst} ${cst} || break
-	of="${cst%.cst}"; of="${of:-$a}"
+	of="${cst%.cst}"; of="${of##*/}"; of="${of:-$a}"
 	of="${do}${of#$do}"
 	# -c (compress) is currently broken:
 	# /bslib.py", line 96, in write_bitstream
@@ -424,14 +485,8 @@ for a in "${arch[@]}"; do
 	  --*) ;;
 	  *) d=--$d ;;
 	esac
-	pcf=
-	test -f "$do.pcf" && pcf="$do.pcf"
-	for p in "" "$do"; do
-	  for f in $a{,-{"$d#-"{,"$pkg"}}}; do
-	    test -f "$p$f".pcf && pcf="$p$f".pcf
-	  done
-	done
-	of="${pcf%.pcf}"; of="${of:-$a}"
+	pcf="$(find_extra pcf $a{,-{"$d#--"{,"$pkg"}}})"
+	of="${pcf%.pcf}"; of="${of##*/}"; of="${of:-$a}"
 	of="${do}${of#$do}"
 	docmd "${cmd[@]}" --asc "${of}.asc" "$d" --package "$p" ${pcf:+--pcf "$pcf"} || break
 	docmd icepack "${of}.asc" "${of}.bin"
@@ -450,14 +505,8 @@ for a in "${arch[@]}"; do
 	  --*) ;;
 	  *) d=--$d ;;
 	esac
-	lpf=
-	test -f "$do.lpf" && lpf="$do.lpf"
-	for p in "" "$do"; do
-	  for f in $a{,-{"$d#-"{,"$pkg"}}}; do
-	    test -f "$p$f".lpf && lpf="$p$f".lpf
-	  done
-	done
-	of="${lpf%.lpf}"; of="${of:-$a}"
+	lpf="$(find_extra lpf $a{,-{"$d#--"{,"$pkg"}}})"
+	of="${lpf%.lpf}"; of="${of##*/}"; of="${of:-$a}"
 	of="${do}${of#$do}"
         docmd "${cmd[@]}" "--textcfg" "${of}.cfg" "$d" --package $pkg ${lpf:+--lpf "$lpf" --lpf-allow-unconstrained} || break
         docmd ecppack --svf "${of}.svf" "${of}.cfg" "${o}.bin"
@@ -466,14 +515,8 @@ for a in "${arch[@]}"; do
     nexus)
       for d in "${nexusdev[@]}"; do
         setdo
-	pdc=
-	test -f "$do.pdc" && pdc="$do.pdc"
-	for p in "" "$do"; do
-	  for f in $a{,-"$d"} "$d"; do
-	    test -f "$p$f".pdc && pdc="$p$f".pdc
-	  done
-	done
-	of="${pdc%.pdc}"; of="${of:-$a}"
+	pdc="$(find_extra pdc $a{,-"$d"} "$d")"
+	of="${pdc%.pdc}"; of="${of##*/}"; of="${of:-$a}"
 	of="${do}${of#$do}"
         docmd "${cmd[@]}" --device "$d" --asc "${of}.asc" ${pdc:+--pdc "$pdc"} || continue
       done
@@ -485,12 +528,123 @@ for a in "${arch[@]}"; do
 	  z) d=xc7z010 ;;
 	  k) d=xc7k325t/ffg676-1 ;;
 	esac
+        case "$d" in
+	  */*) pkg="${d#*/}"; pkg="${pkg%%-*}" ;;
+	  *)   pkg=clg400 ;;
+	esac
+	case "$d" in
+	  *-*) spd="${d#*-}" ;;
+	  *)   spd=1 ;;
+	esac
+	d="${d%%[/-]*}$pkg${spd:+-}$spd"
+	# Maybe if I get another Xilinx board, I'll tighten up the
+	# device name parsing.  I only care about xc7z010 right now.
+	rd="$d"
+	case "$d" in
+	  zynq7*) fam=zynq7; rd="xc7z${rd#zynq7}" ;;
+	  xc7z*) fam=zynq7 ;;
+	  artix7*) fam=zynq7; rd="xc7a${rd#zynq7}" ;;
+	  xc7a*) fam=artix7 ;;
+	  spartan7*) fam=zynq7; rd="xc7s${rd#zynq7}" ;;
+	  xc7s*) fam=spartan7 ;;
+	  kintex7*) fam=kintex7; rd="xc7k${rd#kintex7}" ;;
+	  xc7k*) fam=kintex7 ;;
+	  *) echo "Unsupported device $x"; exit 1 ;;
+	esac
+	bd="${d#xc7[akz]}"
+	bd0="${d%$bd}"
+	bd="$bd0${bd/[^t0-9]*/}"
+	xdc="$(find_extra xdc $a{,-"$bd"}{,"-$pkg"})"
+	sdc="$(find_extra sdc $a{,-"$bd"}{,"-$pkg"})"
+	of="${xdc%.xdc}"; of="${of##*/}"; of="${of:-$a}"
+	of="${do}${of#$do}"
+        #######################
+	# Actually, forget nextpnr-xilinx.  It isn't ready for prime time.
+	# It doesn't support MMCME2 (and maybe others), and It won't even
+	# compile my HDMI demo:
+	#
+	# ERROR: Failed to route arc 0 of net 'genblk1[2].ddr_out', from SITEWIRE/OLOGIC_X0Y96/OUTFF_Q to SITEWIRE/IOB_X0Y95/O_IN.
+	#
+	# Note that f4pga is not a viable alternative.  In addition to
+	# using the despicable conda and way too much Python, it produces
+	# unusable results in my HDMI tests, and doesn't support MMCME2 or
+	# BUFR or  xc7k325t.  I have removed all support for f4pga from my
+	# system.
+	#
+	# Just use Vivado.  Unlike the Gowin toolset, it it's only partially
+	# free of charge, but at least it supports the EBAZ4205, my primary
+	# target.  Too bad it doesn't also support the ZYJZGW as well
+	# (xc7k325t).
+	# is also at least missing MMCME2.  It also fails to compile my
+	# ebaz demo with a routing error (ODDR->OBUFDS).  Since it's probably
+	# yosys' fault that the HDMI is broken, it's probably broken with
+	# nextpnr-xilinx as well.
+	if [ -z "$use_yosys" ]; then
+	  # Vivado
+          # As of now:
+          #  Vivado 2017.2 barfs on my zynq macro library
+          # Vivado 2022.2 crashes in GUI on trying to start processing.
+          #   I guess this is what finally motivated me to try a TCL script, but:
+          # Vivado 2022.2 crashes on completion of routing (corrupted memory?)
+	  #   This is due to my "nonet" wrapper.  I guess that for now I'll
+	  #   disable it, since I don't actually see it calling home.
+	  # Note: vivado on my system wraps it in nonet (no calling home for you!)
+	  # It is possible to use 2017.2 anyway, if I use verilator -P -E to
+	  # preprocess Verilog files, but I'd rather not deal with it.
+	  # Note: vivado on my system sources the settings file internally:
+          #. /opt/Xilinx/Vivado/2022.2/settings64.sh
+	  # Note: use of ${.../../..&..} is a bashism.  I'm already using bash, so whatever.
+	  #       behavior of ${a[*]/...} is probably bash-specific as well.
+          cat >build.tcl <<EOF
+            create_project -in_memory -part $rd
+	    # FIXME: quote names
+            ${vf:+read_verilog -sv ${vf[*]}}
+	    ${vhdf:+read_vhdl ${vhdf[*]}}
+            ${xdc:+read_xdc $xdc}
+            ${sdc:+read_xdc $sdc}
+
+            synth_design ${defs[*]/*/-verilog_define \{&\}} -top $top -part $rd -include_dirs {{$wd}${libpatha:+ }${libpatha[*]/*/\{&\}}}
+            report_timing_summary -file synth_timing_summary.rpt
+            report_power -file synth_power.rpt
+            write_checkpoint -force synthesis
+
+            opt_design
+            place_design
+            phys_opt_design
+            report_timing_summary -file place_timing_summary.rpt
+            write_checkpoint -force place
+            # I cheat on one of the MMCMs:  1207 VCO w/ max 1200
+            # If there is a way to turn it into a warning, I can't find the docs
+            set_property IS_ENABLED FALSE [get_drc_checks PDRC-34]
+            route_design
+            # !!!!!!!!!!!!!!!!!!! Crash !!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            # Either a seg fault or:
+            # free(): invalid pointer
+            # Abnormal program termination (6)
+	    # Probably trying 'net access, failing, and executing untested code
+            report_timing_summary -file route_timing_summary.rpt
+            report_timing -sort_by group -max_paths 100 -path_type summary -file route_timing.rpt
+            report_clock_utilization -file clock_util.rpt
+            report_utilization -file route_util.rpt
+            report_power -file route_power.rpt
+            report_drc -file route_drc.rpt
+            write_checkpoint -force route
+
+            write_bitstream -force $do.bit
+EOF
+          docmd vivado -mode batch -nojournal -nolog -source build.tcl
+	  continue
+	fi
+        #######################
+	# nextpnr-xilinx
 	case "$d" in
 	  *:*) db="${d#*:}"; d="${d%%:*}" ;;
 	  *)   db="$d" ;;
         esac
 	db="${db%%[/-]*}"
 	db="${NEXTPNR_XILINX_DB:-/usr/local/prjxray}/$db"
+	test -f "$db" || db="${db}.bin"
+	test -f "$db" || db=/usr/local/prjxray/$bd
 	test -f "$db" || db="${db}.bin"
 	if [ ! -f "$db" ]; then
 	  bdb="${db##*/}"
@@ -505,36 +659,6 @@ You can generate the database from nextpnr-xilinx after building:
 EOF
 	  exit 1
 	fi
-        case "$d" in
-	  */*) pkg="${d#*/}"; pkg="${pkg%%-*}" ;;
-	  *)   pkg=clg400 ;;
-	esac
-	case "$d" in
-	  *-*) spd="${d#*-}" ;;
-	  *)   spd=1 ;;
-	esac
-	d="${d%%[/-]*}$pkg${spd:+-}$spd"
-	rd="$d"
-	# Maybe if I get another Xilinx board, I'll tighten up the
-	# device name parsing.  I only care about xc7z010 right now.
-	case "$d" in
-	  zynq7*) fam=zynq7; rd="xc7z${rd#zynq7}" ;;
-	  xc7z*) fam=zynq7 ;;
-	  artix7*) fam=zynq7; rd="xc7a${rd#zynq7}" ;;
-	  xc7a*) fam=artix7 ;;
-	  spartan7*) fam=zynq7; rd="xc7s${rd#zynq7}" ;;
-	  xc7s*) fam=spartan7 ;;
-	  kintex7*) fam=kintex7; rd="xc7k${rd#kintex7}" ;;
-	  xc7k*) fam=kintex7 ;;
-	  *) echo "Unsupported device $x"; exit 1 ;;
-	esac
-	xdc=
-	test -f "$do.xdc" && xdc="$do.xdc"
-	for p in "" "$do"; do
-	  for f in $a{,-{"$d#-"{,"$pkg"}}}; do
-	    test -f "$p$f".xdc && xdc="$p$f".xdc
-	  done
-	done
 	dbd="${PRJXRAY_DB:-/usr/local/prjxray/prjxray-db}/$fam"
 	if [ ! -d "$dbd" ]; then
 	  echo "Can't find $dbd.  You can clone from https://github.com/SymbiFlow/prjxray-db"
@@ -554,13 +678,45 @@ EOF
 	  echo "Can't find prjxray utils; set PRJXRAY_UTILS."
 	  exit 1
 	fi
-	of="${xdc%.xdc}"; of="${of:-$a}"
-	of="${do}${of#$do}"
+	if grep '^[^#]*get_nets' "$xdc" >/dev/null; then
+	  grep -v '^[^#]*get_nets' "$xdc" >"${xdc##*/}"
+	  xdc="${xdc##*/}"
+	fi
         docmd "${cmd[@]}" --fasm "${of}.fasm" --chipdb "$db" ${xdc:+--xdc "$xdc"} || break
-	docmd "$f2f" --db-root "$dbd" --part $rd "${of}.fasm">"${of}.frames"
+	docmd -o "${of}.frames" "$f2f" --db-root "$dbd" --part $rd "${of}.fasm"
 	docmd "$f2b" --part_file "$dbd/$rd/part.yaml" --part_name "${d%-*}" \
 	             --frm_file "${of}.frames" --output_file "${of}.bin"
       done
+      if false; then
+      # FIXME:  Add bootgen support
+      (
+        echo "all: {"
+        echo "  // [bootimage] part // part is a generated boot image"
+        echo "  [bootloader] fsbl.elf"
+        echo "  [alignment=64] u-boot.elf"
+        echo "  [init] ebaz.int"
+        for x in "${int[@]}"; do
+          echo "  [init] \"$x\"" >>boot.bif
+        done
+        echo "}"
+      ) >boot.bif
+      # Default register inits: clocks, ethernet, SD, UART1
+      (
+        echo "//  .set. 0xF8000120 = 0x1F000200;"
+	# note: expressions, decimal #s are allowed."
+	# ... up to 256 register inits
+        # Recommended for fast NAND boot (1st line also for SD boot):
+        # slcr.ARM_CLK_CTRL  Both    Both     0x1F000200 CPU divisor = 2 (433 MHz)
+        # slcr.SMC_CLK_CTRL  Both    Both     0x00000921 Baud rate divisor = 9 (96 MHz, 10.4 ns)
+        #                                                Timing Parameters:
+        # smc.set_cycles     Both  Non-secure 0x00225133 t_rr=2, t_ar=1, t_clr=1, t_wp=2,
+        #                                                t_rea=1, t_wc=3, t_rc=3
+        # smc.set_opmode     8-bit Non-secure 0x00000000 8-bit width
+        #                   16-bit Non-secure 0x00000001 16-bit width
+        # smc.direct_cmd     Both  Non-secure 0x02400000 Select ModeReg and UpdateRegs
+      ) >ebaz.int
+      docmd bootgen -arch zynq -image boot.bif -o boot.bin
+      fi
       ;;
   esac
   test -f ${o}-pnr.json -a -n "$schem" && docmd json2png ${o}-pnr || :
