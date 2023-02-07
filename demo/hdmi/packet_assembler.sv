@@ -29,13 +29,13 @@ wire [5:0] counter_t2_p1 = {counter, 1'b1};
 // Initialize parity bits to 0
 logic [`va(8,5)] parity = {8'd0, 8'd0, 8'd0, 8'd0, 8'd0};
 
-wire [63:0] bch [3:0];
-assign bch[0] = {parity[`vai(8,0)], sub[`vai(56,0)]};
-assign bch[1] = {parity[`vai(8,1)], sub[`vai(56,1)]};
-assign bch[2] = {parity[`vai(8,2)], sub[`vai(56,2)]};
-assign bch[3] = {parity[`vai(8,3)], sub[`vai(56,3)]};
+wire [`va(64,4)] bch;
+assign bch[`vai(64,0)] = {parity[`vai(8,0)], sub[`vai(56,0)]};
+assign bch[`vai(64,1)] = {parity[`vai(8,1)], sub[`vai(56,1)]};
+assign bch[`vai(64,2)] = {parity[`vai(8,2)], sub[`vai(56,2)]};
+assign bch[`vai(64,3)] = {parity[`vai(8,3)], sub[`vai(56,3)]};
 wire [31:0] bch4 = {parity[`vai(8,4)], header};
-assign packet_data = {bch[3][counter_t2_p1], bch[2][counter_t2_p1], bch[1][counter_t2_p1], bch[0][counter_t2_p1], bch[3][counter_t2], bch[2][counter_t2], bch[1][counter_t2], bch[0][counter_t2], bch4[counter]};
+assign packet_data = {bch[64*3+counter_t2_p1], bch[64*2+counter_t2_p1], bch[64*1+counter_t2_p1], bch[64*0+counter_t2_p1], bch[64*3+counter_t2], bch[64*2+counter_t2], bch[64*1+counter_t2], bch[64*0+counter_t2], bch4[counter]};
 
 // See Figure 5-5 Error Correction Code generator. Generalization of a CRC with binary BCH.
 // See https://web.archive.org/web/20190520020602/http://hamsterworks.co.nz/mediawiki/index.php/Minimal_HDMI#Computing_the_ECC for an explanation of the implementation.

@@ -58,8 +58,7 @@ always @(posedge clk_pixel)
      pb <= { pb[3:0], pb[4] };
   for(i = 0; i < 4; i = i + 1) begin
       always @(posedge clk_shift)
-//         hdmi_shift[i] <= pb[0] ? hdmi_tx[10*i+9:10*i] : { 2'b0, hdmi_shift[i][9:2] };
-         hdmi_shift[i] <= pb[0] ? hdmi_tx[i] : { 2'b0, hdmi_shift[i][9:2] };
+         hdmi_shift[i] <= pb[0] ? hdmi_tx[`vai(10,i)] : { 2'b0, hdmi_shift[i][9:2] };
       wire ddr_out;
       ODDR #(.DDR_CLK_EDGE("SAME_EDGE")) ddr (.D1(hdmi_shift[i][0]), .D2(hdmi_shift[i][1]), .Q(ddr_out),
                  .C(clk_shift), .CE(1'b1), .S(1'b0), .R(1'b0));

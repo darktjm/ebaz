@@ -74,8 +74,8 @@
 //`define r640x480
 //`define r800x600
 //`define r1024x768
-//`define r1280x720
-`define r1920x1080_30
+`define r1280x720
+//`define r1920x1080_30
 //`define r1920x1080
 //`define r2560x1440_30
 //`define r2560x1440
@@ -498,8 +498,8 @@ localparam DVI_V_POLAR  = 1'b0;
 
   localparam x_bits = $clog2(DVI_H_ACTIVE+1);
   
-  wire [10:0] cx, cy;
-  wire [10:0] icx = DVI_H_ACTIVE - 10'b1 - cx;
+  wire [11:0] cx, cy;
+  wire [11:0] icx = DVI_H_ACTIVE - 12'b1 - cx;
   wire [7:0] gs = cx > DVI_H_ACTIVE / 2 ?
                      cx[x_bits - 2:x_bits - 9] :
                      icx[x_bits - 2:x_bits - 9];
@@ -513,8 +513,8 @@ localparam DVI_V_POLAR  = 1'b0;
 
   reg [15:0] audio_sample_word [1:0];
   always @(posedge clk125) begin
-    audio_sample_word[0] <= {1'b0, {15{~KEY[2]}} & ctr[16:2]}; // W
-    audio_sample_word[1] <= {1'b0, {15{~KEY[5]}} & ctr[15:1]}; // E
+    audio_sample_word[1] <= {1'b0, {15{~KEY[2]}} & ctr[16:2]}; // W
+    audio_sample_word[0] <= {1'b0, {15{~KEY[5]}} & ctr[15:1]}; // E
   end
   wire clk_audio;
   reg [11:0] acnt = 0;

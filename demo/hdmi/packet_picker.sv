@@ -29,14 +29,25 @@ module packet_picker
 
 // Connect the current packet type's data to the output.
 logic [7:0] packet_type = 8'd0;
+// Both of these arrays give "has no driver." (250*(24+56*4)=62K on yosys,
+// 500 on Vivado).  The only ones "used" are 0 1 2 h82 h83 h84; thus thes
+// are the only values packet_type ever takes on.
 logic [23:0] headers [255:0];
 logic [`va(56,4)] subs [255:0];
+// That's way too many warnings not to suppress, so assign them to 0. -- tjm
+generate
+genvar i;
+for(i = 0; i < 256; i++)
+  if((i > 2 && i < 130) || i > 132) begin
+    assign headers[i] = 24'b0;
+    assign subs[i] = {(56*4){1'b0}};
+  end
+endgenerate
 assign header = headers[packet_type];
 assign sub[`vai(56,0)] = subs[packet_type][`vai(56,0)];
 assign sub[`vai(56,1)] = subs[packet_type][`vai(56,1)];
 assign sub[`vai(56,2)] = subs[packet_type][`vai(56,2)];
 assign sub[`vai(56,3)] = subs[packet_type][`vai(56,3)];
-
 // NULL packet
 // "An HDMI Sink shall ignore bytes HB1 and HB2 of the Null Packet Header and all bytes of the Null Packet Body."
 `ifdef MODEL_TECH

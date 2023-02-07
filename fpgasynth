@@ -3,23 +3,23 @@
 set -o posix
 
 # TODO:
-# - make at least 1 nexus binary (requires constraints on all pins)
-#   (I already did this once, but I need to verify it still works)
 # - support use of vhd2vl instead of ghdl
-# - support parallel compile w/ gowin (i.e. non-shared impl dir)
-# - support anlogic via prjtang (not yet usable) or Tang Dynasty (undocumented)
-# - support cyclone 5 (prjmistral) (about as bad as gowin/apicula)
 # - given how bad xilinx/gowin are, maybe look into Lattice Diamond
 # - document just how broken nextpnr-xilinx really is
 # - document known issues w/ yosys (e.g. no tdp RAM w/ shared clock, occasional
 #   assertion crashes, no BSRAM with Gowin's recommended generic Verilog)
 # - support iverilog as target
 # - support verilator as target (include C files)
-# - get rid of .bin as default ext. openFPGALoader doesn't like it.
 # - support partial execution/convert to makefile(-like)
 # - rewrite in C/C++, since it's no longer a short wrapper script around a
 #   just a few tools
 # - separate README
+#
+# Maybe, if I ever get copious amounts of free time, or at least hardware:
+# - support anlogic via prjtang (not yet usable) or Tang Dynasty (undocumented)
+# - support cyclone 5 (prjmistral) (about as bad as gowin/apicula)
+# - make at least 1 nexus binary (requires constraints on all pins)
+#   (I already did this once, but I need to verify it still works)
 #
 # Things I won't do:
 #  - support f4pga.  I hate conda and pip.  Even though it's slightly
@@ -469,7 +469,7 @@ for a in "${arch[@]}"; do
 	# /bslib.py", line 96, in write_bitstream
 	#  [key8Z, key4Z, key2Z] = [i for i,val in enumerate(lst) if val==0][0:3]
         #  ValueError: not enough values to unpack (expected 3, got 0)
-        docmd gowin_pack -d "$d" -o "$of".bin ${o}-pnr.json
+        docmd gowin_pack -d "$d" -o "$of".bit ${o}-pnr.json
 	# openFPGALoader ...
       done
       ;;
@@ -489,7 +489,7 @@ for a in "${arch[@]}"; do
 	of="${pcf%.pcf}"; of="${of##*/}"; of="${of:-$a}"
 	of="${do}${of#$do}"
 	docmd "${cmd[@]}" --asc "${of}.asc" "$d" --package "$p" ${pcf:+--pcf "$pcf"} || break
-	docmd icepack "${of}.asc" "${of}.bin"
+	docmd icepack "${of}.asc" "${of}.bit"
       done
       # openFPGALoader ...
       ;;
@@ -509,7 +509,7 @@ for a in "${arch[@]}"; do
 	of="${lpf%.lpf}"; of="${of##*/}"; of="${of:-$a}"
 	of="${do}${of#$do}"
         docmd "${cmd[@]}" "--textcfg" "${of}.cfg" "$d" --package $pkg ${lpf:+--lpf "$lpf" --lpf-allow-unconstrained} || break
-        docmd ecppack --svf "${of}.svf" "${of}.cfg" "${o}.bin"
+        docmd ecppack --svf "${of}.svf" "${of}.cfg" "${o}.bit"
       done
       ;;
     nexus)
@@ -685,7 +685,7 @@ EOF
         docmd "${cmd[@]}" --fasm "${of}.fasm" --chipdb "$db" ${xdc:+--xdc "$xdc"} || break
 	docmd -o "${of}.frames" "$f2f" --db-root "$dbd" --part $rd "${of}.fasm"
 	docmd "$f2b" --part_file "$dbd/$rd/part.yaml" --part_name "${d%-*}" \
-	             --frm_file "${of}.frames" --output_file "${of}.bin"
+	             --frm_file "${of}.frames" --output_file "${of}.bit"
       done
       if false; then
       # FIXME:  Add bootgen support
