@@ -25,6 +25,12 @@
 `define _COMMA_ ,
 // The free tools and Gowin tools support ; directly, but Vivado barfs
 `define _SEMI_ ;
+// Note sure if it's worth supporting 2017.2.  It complains about my use
+// of input and output as parameter names ("illegal macro parameter") (easy
+// enough to work around) and also complains about something else ("illegal
+// character in macro parameter") (not sure which char).  Maybe the use of
+// default values (i.e., =)?  2022.[12] doesn't complain, but eventually
+// crashes.
 
 // n == 0,1
 `define PS7_ENET_WIRES(n, input =, output =, sep =`_SEMI_) \
@@ -99,11 +105,9 @@
     I2C``n``SCLTN, I2C``n``SDATN
 `define PS7_I2C_PORTS(n) `PS7_I2C_WIRES(n, input, output, `_COMMA_)
 `define PS7_I2C(n) \
-  input wire \
-    `_PS7_EMIO_(I2C``n``SCLI), `_PS7_EMIO_(I2C``n``SDAI), \
-  output wire \
-    `_PS7_EMIO_(I2C``n``SCLO), `_PS7_EMIO_(I2C``n``SDAO), \
-    `_PS7_EMIO_(I2C``n``SCLTN), `_PS7_EMIO_(I2C``n``SDATN)
+   `_PS7_EMIO_(I2C``n``SCLI), `_PS7_EMIO_(I2C``n``SDAI), \
+   `_PS7_EMIO_(I2C``n``SCLO), `_PS7_EMIO_(I2C``n``SDAO), \
+   `_PS7_EMIO_(I2C``n``SCLTN), `_PS7_EMIO_(I2C``n``SDATN)
 
 // n == 0,1
 `define PS7_CAN_WIRES(n, input =, output =, sep =`_SEMI_) \
@@ -144,13 +148,13 @@
     SDIO``n``DATAO, SDIO``n``DATATN
 `define PS7_SDIO_PORTS(n) `PS7_SDIO_WIRES(n, input, output, `_COMMA_)
 `define PS7_SDIO(n) \
-  _PS7_EMIO_(SDIO``n``CDN), _PS7_EMIO_(SDIO``n``CLKFB), _PS7_EMIO_(SDIO``n``WP), \
-  _PS7_EMIO_(SDIO``n``BUSPOW), _PS7_EMIO_(SDIO``n``CLK), _PS7_EMIO_(SDIO``n``LED), \
-  _PS7_EMIO_(SDIO``n``BUSVOLT), \
-  _PS7_EMIO_(SDIO``n``CMDI), \
-  _PS7_EMIO_(SDIO``n``CMDO), \
-  _PS7_EMIO_(SDIO``n``DATAI), \
-  _PS7_EMIO_(SDIO``n``DATAO), _PS7_EMIO_(SDIO``n``DATATN
+  `_PS7_EMIO_(SDIO``n``CDN), _PS7_EMIO_(SDIO``n``CLKFB), _PS7_EMIO_(SDIO``n``WP), \
+  `_PS7_EMIO_(SDIO``n``BUSPOW), _PS7_EMIO_(SDIO``n``CLK), _PS7_EMIO_(SDIO``n``LED), \
+  `_PS7_EMIO_(SDIO``n``BUSVOLT), \
+  `_PS7_EMIO_(SDIO``n``CMDI), \
+  `_PS7_EMIO_(SDIO``n``CMDO), \
+  `_PS7_EMIO_(SDIO``n``DATAI), \
+  `_PS7_EMIO_(SDIO``n``DATAO), _PS7_EMIO_(SDIO``n``DATATN
 
 // n == 0,1
 `define PS7_SPI_WIRES(n, input =, output =, sep =`_SEMI_) \
@@ -205,7 +209,7 @@
   output wire [63:0] GPIOO, GPIOTN
 `define PS7_GPIO_PORTS `PS7_GPIO_WIRES(input, output, `_COMMA_)
 `define PS7_GPIO \
-  _PS7_EMIO_(GPIOI), _PS7_GPIO_(GPIOO), _PS7_GPIO_(GPIOTN)
+  `_PS7_EMIO_(GPIOI), _PS7_GPIO_(GPIOO), _PS7_GPIO_(GPIOTN)
 
 // input EMIOSRAMINTIN;  alert PL that static memory has intr?? (input?)
 
@@ -215,13 +219,13 @@
   output wire [2:0] TTC``n``WAVEO
 `define PS7_TTC_PORTS(n) `PS7_TTC_WIRES(n, input, output, `_COMMA_)
 `define PS7_TTC(n) \
-  _PS7_EMIO_(TTC``n``CLKI), _PS7_EMIO_(TTC``n``WAVEO)
+  `_PS7_EMIO_(TTC``n``CLKI), _PS7_EMIO_(TTC``n``WAVEO)
 
 `define PS7_WDT_WIRES(input =, output =, sep =`_SEMI_) \
   input wire WDTCLKI``sep \
   output wire WDTRSTO
 `define PS7_WDT_PORTS `PS7_WDT_WIRES(input, output, `_COMMA_)
-`define PS7_WDT _PS7_EMIO_(WDTCLKI), _PS7_EMIO_(WDTRSTO)
+`define PS7_WDT `_PS7_EMIO_(WDTCLKI), _PS7_EMIO_(WDTRSTO)
 
 // end of EMIO
 `define _PS7_RAW_(x) .x(x)
@@ -280,17 +284,17 @@
     /**/``ms``AXI``n``RDATA``sep \
   oi wire [idlen-1:0] \
     /**/``ms``AXI``n``BID, /**/``ms``AXI``n``RID
-`define PS7_MAXIGP_WIRES(n, input=, output=, sep=;) \
+`define PS7_MAXIGP_WIRES(n, input=, output=, sep=`_SEMI_) \
   `_AXI_COMMON_WIRES(M, GP``n, output, input, output, 32, 12, sep)
 `define PS7_MAXIGP_PORTS(n) `PS7_MAXIGP_WIRES(n, input, output, `_COMMA_)
-`define PS7_SAXIGP_WIRES(n, input=, output=, sep=;) \
+`define PS7_SAXIGP_WIRES(n, input=, output=, sep=`_SEMI_) \
   `_AXI_COMMON_WIRES(S, GP``n, input, output, output, 32, 6, sep)
 `define PS7_SAXIGP_PORTS(n) `PS7_SAXIGP_WIRES(n, input, output, `_COMMA_)
-`define PS7_SAXIACP_WIRES(input=, output=, sep=;) \
+`define PS7_SAXIACP_WIRES(input=, output=, sep=`_SEMI_) \
   `_AXI_COMMON_WIRES(S, ACP, input, output, output, 64, 3, sep)``sep \
   input [4:0] SAXIACPARUSER, SAXIACPAWUSER
 `define PS7_SAXIACP_PORTS `PS7_SAXIACP_WIRES(input, output, `_COMMA_)
-`define PS7_SAXIHP_WIRES(n, input=, output=, sep=;) \
+`define PS7_SAXIHP_WIRES(n, input=, output=, sep=`_SEMI_) \
   `_AXI_COMMON_WIRES(S, HP``n, input, output, output, 64, 6, sep)``sep \
   output [2:0] SAXIHP``n``RACOUNT``sep \
   output [5:0] SAXIHP``n``WACOUNT``sep \
