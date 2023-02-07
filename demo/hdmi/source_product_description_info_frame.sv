@@ -1,6 +1,9 @@
 // Implementation of HDMI SPD InfoFrame packet.
 // By Sameer Puri https://github.com/sameer
 
+// tjm - ported to yosys-sv
+`include "ysv-supt.v"
+
 // See CEA-861-D Section 6.5 page 72 (84 in PDF)
 module source_product_description_info_frame
 #(
@@ -10,7 +13,7 @@ module source_product_description_info_frame
 )
 (
     output logic [23:0] header,
-    output logic [55:0] sub [3:0]
+    output logic [`va(56,4)] sub
 );
 
 localparam bit [4:0] LENGTH = 5'd25;
@@ -57,7 +60,7 @@ generate
     end
     for (i = 0; i < 4; i++)
     begin: pb_to_sub
-        assign sub[i] = {packet_bytes[6 + i*7], packet_bytes[5 + i*7], packet_bytes[4 + i*7], packet_bytes[3 + i*7], packet_bytes[2 + i*7], packet_bytes[1 + i*7], packet_bytes[0 + i*7]};
+        assign sub[`vai(56,i)] = {packet_bytes[6 + i*7], packet_bytes[5 + i*7], packet_bytes[4 + i*7], packet_bytes[3 + i*7], packet_bytes[2 + i*7], packet_bytes[1 + i*7], packet_bytes[0 + i*7]};
     end
 endgenerate
 

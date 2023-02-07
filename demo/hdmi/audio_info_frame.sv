@@ -1,6 +1,9 @@
 // Implementation of HDMI audio info frame
 // By Sameer Puri https://github.com/sameer
 
+// tjm - ported to yosys-sv
+`include "ysv-supt.v"
+
 // See Section 8.2.2
 module audio_info_frame
 #(
@@ -12,7 +15,7 @@ module audio_info_frame
 )
 (
     output logic [23:0] header,
-    output logic [55:0] sub [3:0]
+    output logic [`va(56,4)] sub
 );
 
 // NOTE—HDMI requires the coding type, sample size and sample frequency fields to be set to 0 ("Refer to Stream Header") as these items are carried in the audio stream
@@ -47,7 +50,7 @@ generate
     end
     for (i = 0; i < 4; i++)
     begin: pb_to_sub
-        assign sub[i] = {packet_bytes[6 + i*7], packet_bytes[5 + i*7], packet_bytes[4 + i*7], packet_bytes[3 + i*7], packet_bytes[2 + i*7], packet_bytes[1 + i*7], packet_bytes[0 + i*7]};
+        assign sub[`vai(56,i)] = {packet_bytes[6 + i*7], packet_bytes[5 + i*7], packet_bytes[4 + i*7], packet_bytes[3 + i*7], packet_bytes[2 + i*7], packet_bytes[1 + i*7], packet_bytes[0 + i*7]};
     end
 endgenerate
 endmodule

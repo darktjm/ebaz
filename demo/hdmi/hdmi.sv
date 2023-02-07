@@ -1,6 +1,9 @@
 // Implementation of HDMI Spec v1.4a
 // By Sameer Puri https://github.com/sameer
 
+// tjm - ported to yosys-sv
+`include "ysv-supt.v"
+
 module hdmi 
 #(
     // Defaults to 640x480 which should be supported by almost if not all HDMI sinks.
@@ -96,7 +99,9 @@ module hdmi
     : VIDEO_ID_CODE == 19 ? 74.25E6
     : VIDEO_ID_CODE == 34 ? 74.25E6
     : VIDEO_ID_CODE == 95 || VIDEO_ID_CODE == 105 || VIDEO_ID_CODE == 97 || VIDEO_ID_CODE == 107 ? 594E6
-    : 0) * (VIDEO_REFRESH_RATE == 59.94 || VIDEO_REFRESH_RATE == 29.97 ? 1000.0/1001.0 : 1), // https://groups.google.com/forum/#!topic/sci.engr.advanced-tv/DQcGk5R_zsM
+    : 0) * (VIDEO_REFRESH_RATE * 100/VIDEO_REFRESH_RATE_SCALE == 5994 ||
+            VIDEO_REFRESH_RATE * 100/VIDEO_REFRESH_RATE_SCALE == 2997 ?
+	       1000.0/1001.0 : 1), // https://groups.google.com/forum/#!topic/sci.engr.advanced-tv/DQcGk5R_zsM
 
 
     // The IT content bit indicates that image samples are generated in an ad-hoc
@@ -124,7 +129,8 @@ module hdmi
 
     // Specify the refresh rate in Hz you are using for audio calculations
     // Ignored if VIDEO_RATE manually specified.
-    parameter real VIDEO_REFRESH_RATE = 59.94,
+    parameter int VIDEO_REFRESH_RATE = 5994,
+    parameter int VIDEO_REFRESH_RATE_SCALE = 100,
 
     // As specified in Section 7.3, the minimal audio requirements are met: 16-bit or more L-PCM audio at 32 kHz, 44.1 kHz, or 48 kHz.
     // See Table 7-4 or README.md for an enumeration of sampling frequencies supported by HDMI.
@@ -160,10 +166,10 @@ module hdmi
     // synchronous reset back to 0,0
     input logic reset,
     input logic [23:0] rgb,
-    input logic [AUDIO_BIT_WIDTH-1:0] audio_sample_word [1:0],
+    input logic [`va(AUDIO_BIT_WIDTH,2)] audio_sample_word,
 
     // These outputs go to your HDMI port
-    output logic [9:0] tmds_dat [2:0],
+    output logic [`va(10,3)] tmds_dat,
     output logic [9:0] tmds_clock,
     
     // All outputs below this line stay inside the FPGA
@@ -290,7 +296,7 @@ generate
 
         // See Section 5.2.3.4
         logic [23:0] header;
-        logic [55:0] sub [3:0];
+        logic [`va(56,4)] sub;
         logic video_field_end;
         assign video_field_end = cx == screen_width - 1'b1 && cy == screen_height - 1'b1;
         logic [4:0] packet_pixel_counter;
@@ -357,7 +363,7 @@ generate
     for (i = 0; i < NUM_CHANNELS; i++)
     begin: tmds_gen
         tmds_channel #(.CN(i)) tmds_channel (.clk_pixel(clk_pixel), .video_data(video_data[i*8+7:i*8]), .data_island_data(data_island_data[i*4+3:i*4]), .control_data(control_data[i*2+1:i*2]), .mode(mode), .tmds(tmds_internal[i]));
-	assign tmds_dat[i] = tmds_internal[i];
+	assign tmds_dat[`vai(10,i)] = tmds_internal[i];
     end
 endgenerate
 

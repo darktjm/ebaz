@@ -1,6 +1,8 @@
 `default_nettype none
 `include "ebaz-eth.v" // also includes zynq-ps7.v
 
+`include "ysv-supt.v"
+
 module top (
   output wire CLK25,
   output wire [3:0] HDMI_TX_P, HDMI_TX_N,
@@ -33,12 +35,12 @@ always @(posedge clk100)
   acnt <= acnt == (100000/48)-1 ? 0 : acnt + 1;
 assign clk_audio = acnt[10];
 
-reg [15:0] audio_sample_word [1:0];
+reg [`va(16,2)] audio_sample_word;
 reg [30:0] ctr = 0;
 always @(posedge clk125) begin
   ctr <= ctr + 1;
-  audio_sample_word[0] = ctr[16:8];
-  audio_sample_word[1] = ctr[15:7];
+  audio_sample_word[`vai(16,0)] <= ctr[16:8];
+  audio_sample_word[`vai(16,1)] <= ctr[15:7];
 end
 
 reg [23:0] rgb = 24'd0;
@@ -49,7 +51,7 @@ always @(posedge clk_pixel)
           cx == frame_width - 1'd1 || cy == frame_height - 1'd1 ? ~8'd0 : 8'd0};
 
   genvar i;
-  wire [9:0] hdmi_tx [3:0];
+  wire [`va(10,4)] hdmi_tx;
   reg [9:0] hdmi_shift[3:0];
   reg [4:0] pb = 5'b1;
   always @(posedge clk_shift)
@@ -101,8 +103,8 @@ hdmi #(.VIDEO_ID_CODE(0), // 2560x1440@30
   .reset(1'b0),
   .rgb(rgb),
   .audio_sample_word(audio_sample_word),
-  .tmds_dat(hdmi_tx[2:0]),
-  .tmds_clock(hdmi_tx[3]),
+  .tmds_dat(hdmi_tx[`vas(10,2,0)]),
+  .tmds_clock(hdmi_tx[`vai(10,3)]),
   .cx(cx),
   .cy(cy),
   .frame_width(frame_width),

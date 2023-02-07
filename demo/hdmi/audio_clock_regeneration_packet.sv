@@ -1,10 +1,13 @@
 // Implementation of HDMI audio clock regeneration packet
 // By Sameer Puri https://github.com/sameer
 
+// tjm - ported to yosys-sv
+`include "ysv-supt.v"
+
 // See HDMI 1.4b Section 5.3.3
 module audio_clock_regeneration_packet
 #(
-    parameter real VIDEO_RATE = 25.2E6,
+    parameter int VIDEO_RATE = 25.2E6,
     parameter int AUDIO_RATE = 48e3
 )
 (
@@ -12,7 +15,7 @@ module audio_clock_regeneration_packet
     input logic clk_audio,
     output logic clk_audio_counter_wrap = 0,
     output logic [23:0] header,
-    output logic [55:0] sub [3:0]
+    output logic [`va(56,4)] sub
 );
 
 // See Section 7.2.3, values derived from "Other" row in Tables 7-1, 7-2, 7-3.
@@ -37,8 +40,8 @@ logic [1:0] clk_audio_counter_wrap_synchronizer_chain = 2'd0;
 always_ff @(posedge clk_pixel)
     clk_audio_counter_wrap_synchronizer_chain <= {internal_clk_audio_counter_wrap, clk_audio_counter_wrap_synchronizer_chain[1]};
 
-localparam bit [19:0] CYCLE_TIME_STAMP_COUNTER_IDEAL = 20'(int'(VIDEO_RATE * int'(N) / 128 / AUDIO_RATE));
-localparam int CYCLE_TIME_STAMP_COUNTER_WIDTH = $clog2(20'(int'(real'(CYCLE_TIME_STAMP_COUNTER_IDEAL) * 1.1))); // Account for 10% deviation in audio clock
+localparam bit [19:0] CYCLE_TIME_STAMP_COUNTER_IDEAL = 20'(VIDEO_RATE / 1000 * N / 128 / (AUDIO_RATE / 1000));
+localparam int CYCLE_TIME_STAMP_COUNTER_WIDTH = $clog2(20'(CYCLE_TIME_STAMP_COUNTER_IDEAL * 11 / 10)); // Account for 10% deviation in audio clock
 
 logic [19:0] cycle_time_stamp = 20'd0;
 logic [CYCLE_TIME_STAMP_COUNTER_WIDTH-1:0] cycle_time_stamp_counter = CYCLE_TIME_STAMP_COUNTER_WIDTH'(0);
@@ -66,7 +69,7 @@ genvar i;
 generate
     for (i = 0; i < 4; i++)
     begin: same_packet
-        assign sub[i] = {N[7:0], N[15:8], {4'd0, N[19:16]}, cycle_time_stamp[7:0], cycle_time_stamp[15:8], {4'd0, cycle_time_stamp[19:16]}, 8'd0};
+        assign sub[`vai(56,i)] = {N[7:0], N[15:8], {4'd0, N[19:16]}, cycle_time_stamp[7:0], cycle_time_stamp[15:8], {4'd0, cycle_time_stamp[19:16]}, 8'd0};
     end
 endgenerate
 
