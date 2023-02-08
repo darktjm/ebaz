@@ -35,12 +35,12 @@ always @(posedge clk100)
   acnt <= acnt == (100000/48)-1 ? 0 : acnt + 1;
 assign clk_audio = acnt[10];
 
-reg [`va(16,2)] audio_sample_word;
+reg [15:0] audio_sample_word [1:0];
 reg [30:0] ctr = 0;
 always @(posedge clk125) begin
   ctr <= ctr + 1;
-  audio_sample_word[`vai(16,0)] <= ctr[16:8];
-  audio_sample_word[`vai(16,1)] <= ctr[15:7];
+  audio_sample_word[0] = ctr[16:8];
+  audio_sample_word[1] = ctr[15:7];
 end
 
 reg [23:0] rgb = 24'd0;
@@ -48,7 +48,7 @@ wire [11:0] cx, cy, frame_width, frame_height, screen_width, screen_height;
 // Border test (left = red, top = green, right = blue, bottom = blue, fill = black)
 always @(posedge clk_pixel)
   rgb <= {cx == 0 ? ~8'd0 : 8'd0, cy == 0 ? ~8'd0 : 8'd0,
-          cx == frame_width - 1'd1 || cy == frame_height - 1'd1 ? ~8'd0 : 8'd0};
+          cx == screen_width - 1'd1 || cy == screen_height - 1'd1 ? ~8'd0 : 8'd0};
 
   genvar i;
   wire [`va(10,4)] hdmi_tx;
@@ -65,43 +65,63 @@ always @(posedge clk_pixel)
       OBUFDS vidout(.I(ddr_out), .O(HDMI_TX_P[i]), .OB(HDMI_TX_N[i]));
   end
 
-//vpll25_2 vpll(.clk100(clk100), .clk_pixel(clk_pixel), .clk_shift(clk_shift));
-//hdmi #(.VIDEO_ID_CODE(1), .VIDEO_REFRESH_RATE(60), // 640x480@60
-//vpll40 vpll(.clk100(clk100), .clk_pixel(clk_pixel), .clk_shift(clk_shift));
-//hdmi #(.VIDEO_ID_CODE(0), // 800x600@60
-//       .VIDEO_RATE(40000000), .SCREEN_WIDTH(800), .SCREEN_HEIGHT(600),
-//       .FRAME_WIDTH(800+88+128+40), .FRAME_HEIGHT(600+23+4+1),
-//       .HSYNC_PULSE_START(40), .HSYNC_PULSE_SIZE(128),
-//       .VSYNC_PULSE_START(1), .VSYNC_PULSE_SIZE(4),
-//vpll65 vpll(.clk100(clk100), .clk_pixel(clk_pixel), .clk_shift(clk_shift));
-//hdmi #(.VIDEO_ID_CODE(0), // 800x600@60
-//       .VIDEO_RATE(65000000), .SCREEN_WIDTH(1024), .SCREEN_HEIGHT(768),
-//       .FRAME_WIDTH(1024+24+130+160), .FRAME_HEIGHT(768+3+6+29),
-//       .HSYNC_PULSE_START(24), .HSYNC_PULSE_SIZE(130),
-//       .VSYNC_PULSE_START(3), .VSYNC_PULSE_SIZE(6),
-//vpllm74_25 vpll(.clk100(clk100), .clk_pixel(clk_pixel), .clk_shift(clk_shift));
-//hdmi #(.VIDEO_ID_CODE(4), .VIDEO_REFRESH_RATE(60), // 1280x720@60
-//vpllm74_25 vpll(.clk100(clk100), .clk_pixel(clk_pixel), .clk_shift(clk_shift));
-//hdmi #(.VIDEO_ID_CODE(34), .VIDEO_REFRESH_RATE(30), // 1920x1080@30
-//vpllm148_5 vpll(.clk100(clk100), .clk_pixel(clk_pixel), .clk_shift(clk_shift));
-//hdmi #(.VIDEO_ID_CODE(16), .VIDEO_REFRESH_RATE(60), // 1920x1080@60
+// Note: no video beyond 120.75MHz (2560x1440@30).  It used to produce video,
+// but no sound w/ 1920x1080@60 (148.5MHz), but no longer.  Slight changes
+// in the code cause everything to be optimized differently, I guess.
+`define r2560x1440_30
+`ifdef r640x480
+vpll25_2 vpll(.clk100(clk100), .clk_pixel(clk_pixel), .clk_shift(clk_shift));
+hdmi #(.VIDEO_ID_CODE(1), .VIDEO_REFRESH_RATE(60), // 640x480@60
+`endif
+`ifdef r800x600
+vpll40 vpll(.clk100(clk100), .clk_pixel(clk_pixel), .clk_shift(clk_shift));
+hdmi #(.VIDEO_ID_CODE(0), // 800x600@60
+       .VIDEO_RATE(40000000), .SCREEN_WIDTH(800), .SCREEN_HEIGHT(600),
+       .FRAME_WIDTH(800+88+128+40), .FRAME_HEIGHT(600+23+4+1),
+       .HSYNC_PULSE_START(40), .HSYNC_PULSE_SIZE(128),
+       .VSYNC_PULSE_START(1), .VSYNC_PULSE_SIZE(4),
+`endif
+`ifdef r1024x768
+vpll65 vpll(.clk100(clk100), .clk_pixel(clk_pixel), .clk_shift(clk_shift));
+hdmi #(.VIDEO_ID_CODE(0), // 1024x768@60
+       .VIDEO_RATE(65000000), .SCREEN_WIDTH(1024), .SCREEN_HEIGHT(768),
+       .FRAME_WIDTH(1024+24+130+160), .FRAME_HEIGHT(768+3+6+29),
+       .HSYNC_PULSE_START(24), .HSYNC_PULSE_SIZE(130),
+       .VSYNC_PULSE_START(3), .VSYNC_PULSE_SIZE(6),
+`endif
+`ifdef r1280x720
+vpllm74_25 vpll(.clk100(clk100), .clk_pixel(clk_pixel), .clk_shift(clk_shift));
+hdmi #(.VIDEO_ID_CODE(4), .VIDEO_REFRESH_RATE(60), // 1280x720@60
+`endif
+`ifdef r1920x1080_30
+vpllm74_25 vpll(.clk100(clk100), .clk_pixel(clk_pixel), .clk_shift(clk_shift));
+hdmi #(.VIDEO_ID_CODE(34), .VIDEO_REFRESH_RATE(30), // 1920x1080@30
+`endif
+`ifdef r1920x1080
+vpllm148_5 vpll(.clk100(clk100), .clk_pixel(clk_pixel), .clk_shift(clk_shift));
+hdmi #(.VIDEO_ID_CODE(16), .VIDEO_REFRESH_RATE(60), // 1920x1080@60
+`endif
+`ifdef r2560x1440_30
 vpll120_75 vpll(.clk100(clk100), .clk_pixel(clk_pixel), .clk_shift(clk_shift));
 hdmi #(.VIDEO_ID_CODE(0), // 2560x1440@30
        .VIDEO_RATE(120750000), .SCREEN_WIDTH(2560), .SCREEN_HEIGHT(1440),
        .FRAME_WIDTH(2560+48+32+80), .FRAME_HEIGHT(1440+3+5+33),
        .HSYNC_PULSE_START(48), .HSYNC_PULSE_SIZE(32),
        .VSYNC_PULSE_START(3), .VSYNC_PULSE_SIZE(5),
-//hdmi #(.VIDEO_ID_CODE(0), // 2560x1440@60
-//       .VIDEO_RATE(241500000), .SCREEN_WIDTH(2560), .SCREEN_HEIGHT(1440),
-//       .FRAME_WIDTH(2560+48+32+80), .FRAME_HEIGHT(1440+3+5+33),
-//       .HSYNC_PULSE_START(48), .HSYNC_PULSE_SIZE(32),
-//       .VSYNC_PULSE_START(3), .VSYNC_PULSE_SIZE(5),
+`endif
+`ifdef r2560x1440
+hdmi #(.VIDEO_ID_CODE(0), // 2560x1440@60
+       .VIDEO_RATE(241500000), .SCREEN_WIDTH(2560), .SCREEN_HEIGHT(1440),
+       .FRAME_WIDTH(2560+48+32+80), .FRAME_HEIGHT(1440+3+5+33),
+       .HSYNC_PULSE_START(48), .HSYNC_PULSE_SIZE(32),
+       .VSYNC_PULSE_START(3), .VSYNC_PULSE_SIZE(5),
+`endif
        .AUDIO_RATE(48000), .AUDIO_BIT_WIDTH(16)) hdmi(
   .clk_pixel(clk_pixel),
   .clk_audio(clk_audio),
   .reset(1'b0),
   .rgb(rgb),
-  .audio_sample_word(audio_sample_word),
+  .audio_sample_word({audio_sample_word[1], audio_sample_word[0]}),
   .tmds_dat(hdmi_tx[`vas(10,2,0)]),
   .tmds_clock(hdmi_tx[`vai(10,3)]),
   .cx(cx),
