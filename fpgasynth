@@ -304,7 +304,8 @@ fi
 # Extract top module from JSON
 topmod="$(jq -c < ${opref}raw.json '.modules|to_entries|
    map(select(.value.attributes.top > 0))|.[]')"
-top="$(echo "$topmod" | jq -r .key)"
+xtop="$(echo "$topmod" | jq -r .key)"
+test -n "$xtop" && top="$xtop"
 echo "Top: $top"
 # Extract its port list
 ports="$(echo "$topmod" | jq -c '.value.ports|to_entries|

@@ -60,24 +60,22 @@
 //     with tons of red vertical stripes.  No audio.
 //   Using old dvi encoder, only 1024x768, 1280x720 have video, and that's
 //     corrupted w/ red vertical stripes (mostly stable, though)
-//   Not yet ready to test "hdmi" encoder
+//   Chucked f4pga before finishing the yosys conversion of "hdmi" encoder
 // yosys+nextpnr-xilinx: (no MMCM, no BUFR)
 //   Fails to build; can't route ODDR to OBUFDS.
 // Vivado:
-//   Perfect video with dvi and hdmi-audio encoder up to 1920x1080@30
-//     No video with either encoder past that.  No audio.
-//   Perfect video+audio using "hdmi" encoder up to 1920x1080@30
-//   No video+audio 1920x1080@60 2560x1440
-//     However, when I ran independent tests, I got video @1920x1080@60
-//     and video+audio @2560x1440.  I guess it depends on how things get
-//     optimized/layed out.
+//   Perfect video with dvi, hdmi-audio, "hdmi" encoder up to 1920x1080@30
+//     Nothiing past that, even though independent tests of "hdmi" gave
+//       video+audio w/ 2560x1440@30 and video at least on 1920x1080@60.
+//       I guess it depends on how things get optimized/layed out.
+//     No audio on hdmi-audio encoder, but perfect audio on "hdmi".
 //`define r640x480
 //`define r800x600
 //`define r1024x768
-`define r1280x720
-//`define r1920x1080_30
-//`define r1920x1080
+//`define r1280x720
+`define r1920x1080_30
 //`define r2560x1440_30
+//`define r1920x1080
 //`define r2560x1440
 //`define r2560x1440_75
 //    18 pins on .100/2.54mm header (H4)
