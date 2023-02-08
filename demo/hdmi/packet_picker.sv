@@ -51,7 +51,7 @@ assign sub[`vai(56,3)] = subs[packet_type][`vai(56,3)];
 // NULL packet
 // "An HDMI Sink shall ignore bytes HB1 and HB2 of the Null Packet Header and all bytes of the Null Packet Body."
 `ifdef MODEL_TECH
-assign headers[0] = {8'd0, 8'd0, 8'd0}; assign subs[0] = '{56'd0, 56'd0, 56'd0, 56'd0};
+assign headers[0] = {8'd0, 8'd0, 8'd0}; assign subs[0] = {56'd0, 56'd0, 56'd0, 56'd0};
 `else
 assign headers[0] = {8'dX, 8'dX, 8'd0};
 assign subs[0][`vai(56,0)] = 56'dX;
@@ -81,8 +81,7 @@ logic [`va(AUDIO_BIT_WIDTH,2)] audio_sample_word_transfer;
 logic audio_sample_word_transfer_control = 1'd0;
 always_ff @(posedge clk_audio)
 begin
-    audio_sample_word_transfer[`vai(AUDIO_BIT_WIDTH,0)] <= audio_sample_word[`vai(AUDIO_BIT_WIDTH,0)];
-    audio_sample_word_transfer[`vai(AUDIO_BIT_WIDTH,1)] <= audio_sample_word[`vai(AUDIO_BIT_WIDTH,1)];
+    audio_sample_word_transfer <= audio_sample_word;
     audio_sample_word_transfer_control <= !audio_sample_word_transfer_control;
 end
 
@@ -125,7 +124,7 @@ begin
     end
 end
 
-logic [`va(24,4*2)] audio_sample_word_packet;
+logic [`va(24,2*4)] audio_sample_word_packet;
 logic [3:0] audio_sample_word_present_packet;
 
 logic [7:0] frame_counter = 8'd0;

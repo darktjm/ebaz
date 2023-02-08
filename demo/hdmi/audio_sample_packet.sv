@@ -56,7 +56,7 @@ module audio_sample_packet
     input logic [`va(2,4)] valid_bit,
     // See IEC 60958-3 Section 6. 0 indicates that no user data is being sent
     input logic [`va(2,4)] user_data_bit,
-    input logic [`va(24,4*2)] audio_sample_word,
+    input logic [`va(24,2*4)] audio_sample_word,
     input logic [3:0] audio_sample_word_present,
     output logic [23:0] header,
     output logic [`va(56,4)] sub
