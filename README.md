@@ -10,14 +10,17 @@ vague awareness of their existence.  It's been more than 30 years
 since I was an electronics hobbyist on my aborted EE path.
 
 This repository may disappear at any time, since it is only a
-subproject of a larger FPGA-related project, and I might merge it with
-that.
+subproject of a larger (not yet public) FPGA-related project, and I
+might merge it with that.  That project is stalled for now, though.
+The stall is both for technical issues and a slight divergence into
+another side project, which is even larger in some respects.
 
-I also own and use an expansion board which I cannot identify.  I
-got it from the JSSHENGZHI store on AliExpress.   See
+I also own and use an expansion board which I cannot identify.  I got
+it from the JSSHENGZHI store on AliExpress.  See
 `hdmi-lcd-board-schem.jpg` for a schematic (pulled from the AliExpress
-product page, <https://www.aliexpress.us/item/3256804274079996.html> and
-combined from 2 images into 1 for convenience).
+product page, <https://www.aliexpress.us/item/3256804274079996.html>;
+I will make no attempt to ensure this link stays alive) and combined
+from 2 images into 1 for convenience).
 
 Other files of note:
 
@@ -27,7 +30,13 @@ Other files of note:
     for every project.  I don't like hand-editing stuff that
     should be "standard", so I choose the former option.
 
-    Note that this does not include timing constraints.
+    Note that this does not include timing constraints.  For the free
+    tools in particular, there is no way to provide a common file.
+    For Vivado, the PLLs auto-create clocks, so it probably isn't
+    necessary for simple projects.  Really, though, I have no idea
+    what I'm doing timing-wise, and should probably do more research.
+    Timing constraints may well be the reason for inconsistently bad
+    behavior of the HDMI demo.
 
     I guess placing comments after lines doesn't work as I would
     expect (maybe that's not legal TCL?), because Vivado gives
@@ -107,7 +116,9 @@ Other files of note:
 
   - `ysv-supt.v` - macro library to assist in one of the issues porting
     SystemVerilog code to yosys-native (rather than the Surelog
-    plugin).  See `demo/hdmi` for example usage.
+    plugin).  See `demo/hdmi` for example usage.  While this fixes the
+    yosys array access errors, the hdmi code still does not work with
+    the free toolchain.
 
   - `demo` - against my better judgement, I have included my
     simple demo which exercises the components I want: LEDs,
@@ -129,6 +140,9 @@ Other files of note:
 	broken merge in progress of j1a/j1b by me)
     These include minor patches to fix compilation issues with Vivado
     and/or f4pga.
+
+Booting
+-------
 
 I have successfully booted from SD card (instead of moving the
 resistor, I patched a resistor to a non-connected pin on the JTAG
@@ -159,17 +173,20 @@ My grumbling; feel free to ignore
 ---------------------------------
 
 Probably my biggest disapppointment is that I had to resort to
-commercial tools for this (and Gowin support).  I was under the
-impression that the free tools were at least mostly ready; it appears
-that I was misled.  It really only works for Lattice parts (at least
-the ones I'm interested in).  In the case of Gowin, it is missing
+commercial tools for this (and Gowin support, and, more recently, even
+for Lattice ECP5 support).  I was under the impression that the free
+tools were at least mostly ready; it appears that I was misled.  It
+really only works for simple demos.  With luck, you might get other
+stuff to work as well (barely).  In the case of Gowin, it is missing
 critically important primitives and support for non-primitive on-board
 hardware; this was the first one I replaced with the commercial tool
-in `fpgasynth`.  For Xilinx, I was able to initially work around the
-lack of important primitives in f4pga, but even then in some tests
-Vivado produces perfect working bitstreams where f4pga produces mostly
-garbage.  At least both commercial tools have Linux binaries, so I
-don't have to additionally deal with wine issues.  At least the
+in `fpgasynth` (June 2022).  For Xilinx, I was able to initially work
+around the lack of important primitives in f4pga (Oct 2022), but, even
+then, in some tests, Vivado produces perfect working bitstreams, where
+f4pga produces mostly garbage (Jan 2023).  At least both commercial
+tools have Linux binaries, so I don't have to additionally deal with
+wine issues.  Both have their own way of spraying files all over the
+place, but can be mostly controlled via scripting.  At least the
 free-of-charge Gowin toolchain (not the educational version) supports
 all devices and all device features.  The free-of-charge Xilinx
 toolchain supports the xc7z010 on the EBAZ, but doesn't support most
@@ -184,26 +201,45 @@ sorts).  Both vendors like to force you to use proprietary IP blocks
 plague that they are, until of course I find a need for one and have
 to capitulate yet again.
 
+Addendum to prev. paragraph, Feb. 2023:  And now, the last one has
+fallen.  Even the Lattice ECP5 doesn't work right with the free tools,
+as far as I can tell.  I have yet to build a bitstream with Diamond,
+but the HDMI sound test doesn't produce any output, even though the
+same, identical code (except for what primitives are being used) works
+with both Gowin and Xilinx commercial tools.  The free tools provide
+no warnings or errors to indicate anything is wrong; it simply
+produces no output, and I don't feel like tracing it with a 'scope.
+In fact, I don't feel like wading throug yet another poorly commercial
+toolchain to script it all, so I may just abandon the ECP5 for now.
+So, my question went from "what parts are fully supported by the free
+tools" to "what parts are supported well enough by the free tools" to
+"what free of charge vendor tools are usable".  The answer to the
+former two questions is apparently "none":  the free tools are not
+ready for prime time, and I am not willing to fix them myself right
+now so that they are.  The answer to the latter question is "Only
+Gowin supports all parts and features, and also documents the
+scripting in a usable manner".
+
 I despise Python with the passion of a thoused fiery suns.  The
 language (uncompilable, whitespace as a control structure, other
 issues common with interprted languages, like significant file names
 and forced file structuring and simple integrity checks impossible to
 do until run-time) and its interpreter(s) (consumes all available
-resources if possible), but the ecosystem is even worse.  Instead of
-providing a stable environment, every Python program has to have an
-entire Python distribution attached.  No single binary, but a whole
-tree for every Python program.  Python "environments" managed by
-crappy package managers (pip and conda) which bypass the system
-package manager to do their own thing, in your home directory (where
-installed software does not belong).  This all seems like a poor joke.
-F4pga installs 60,000 files, consuming 3GB.  Entire usable operating
-systems with user space are smaller and better managed.  These
-comments apply both to f4pga in particular and the various reverse
-engineering projects, as well.  I have no idea how Python ever got so
-popular, but it's become the new Visual BASIC. Popular, but impossible
-to actually write good code in.
+resources if possible) are bad enough, but the ecosystem is even
+worse.  Instead of providing a stable environment, every Python
+program has to have an entire Python distribution attached.  No single
+binary, but a whole tree for every Python program.  Python
+"environments" managed by crappy package managers (pip and conda)
+which bypass the system package manager to do their own thing, in your
+home directory (where installed software does not belong).  This all
+seems like a poor joke.  F4pga installs 60,000 files, consuming 3GB.
+Entire usable operating systems with user space are smaller and better
+managed.  These comments apply both to f4pga in particular and the
+various reverse engineering projects, as well.  I have no idea how
+Python ever got so popular, but it's become the new Visual BASIC.
+Popular, but impossible to actually write good code in.
 
-"F4PGA: The GCC of FPGAs".  Right.  Not only is it not a standalone
+"F4PGA:  The GCC of FPGAs".  Right.  Not only is it not a standalone
 project (all components except for the crappy Python glue code come
 from elsewhere, although the yosys plugins are essentially part of
 f4pga as well), but it's extremely poorly documented (an example can
@@ -235,11 +271,12 @@ easier).
 Unfotunately, even though `nextpnr-xilinx` is much faster and produces
 better reports, it has more missing primitives and can't even compile
 my simple HDMI test (maybe because I built it incorrectly, but it's
-hard for me to tell either way).  I do not see f4pga going anywhere I
-want to follow, so if I do put effort into making a free tool work
-better, it will be `nextpnr-xilinx`.  Significantly less than 60k/3GB
-files, and at least far less Python (seems impossible to get away from
-it entirely without rewriting everything from scratch).
+hard for me to tell either way, especially given the wonderful
+documentation).  I do not see f4pga going anywhere I want to follow,
+so if I do put effort into making a free tool work better, it will be
+`nextpnr-xilinx`.  Significantly less than 60k/3GB files, and at least
+far less Python (seems impossible to get away from it entirely without
+rewriting everything from scratch).
 
 Given my frustration with how f4pga is structured and the lack of
 support for important things (no devices other than what the free
