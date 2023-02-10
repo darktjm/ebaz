@@ -37,11 +37,12 @@ logic [`va(56,4)] subs [255:0];
 // That's way too many warnings not to suppress, so assign them to 0. -- tjm
 generate
 genvar i;
-for(i = 0; i < 256; i++)
+for(i = 0; i < 256; i++) begin: hsinit
   if((i > 2 && i < 130) || i > 132) begin
     assign headers[i] = 24'b0;
     assign subs[i] = {(56*4){1'b0}};
   end
+end
 endgenerate
 assign header = headers[packet_type];
 assign sub[`vai(56,0)] = subs[packet_type][`vai(56,0)];

@@ -4,6 +4,7 @@ set -o posix
 
 # TODO:
 # - support use of vhd2vl instead of ghdl
+# - support mixed vhdl/verilog[/systemverilog]
 # - given how bad xilinx/gowin are, maybe look into Lattice Diamond
 # - document just how broken nextpnr-xilinx really is
 # - document known issues w/ yosys (e.g. no tdp RAM w/ shared clock, occasional
@@ -183,6 +184,7 @@ test -z "$nexusdev" && nexusdev=(LIFCL-40-8SG72CES)
 test -z "$xdev" && xdev=(xc7z010)
 
 setdo() {
+  cd "$wd"
   case "$d" in
     *"#"*) do="${d#*\#}"; d="${d%%\#*}" ;;
     *) do="$opref" ;;
@@ -367,6 +369,7 @@ for a in "${arch[@]}"; do
 	esac
 	rd="${d%%??/*}"
         cst="$(find_extra cst $a{,-{"$od","$rd"}})"
+	sdc="$(find_extra sdc $a{,-{"$od","$rd"}})"
         #######################
 	# Actually, forget apicula and its spinoffs.  It isn't ready for
 	# prime time.  Just use the Gowin toolset.  It's free of charge.
@@ -445,6 +448,7 @@ for a in "${arch[@]}"; do
 	       esac
 	    done
 	    test -n "$cst" && echo "add_file {$cst}"
+	    test -n "$sdc" && echo "add_file {$sdc}"
 	    echo "run all"
           ) >${do}gowin.tcl
 	  ob="${ob:-project}"

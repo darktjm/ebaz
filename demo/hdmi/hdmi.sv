@@ -175,8 +175,8 @@ module hdmi
     // All outputs below this line stay inside the FPGA
     // They are used (by you) to pick the color each pixel should have
     // i.e. always_ff @(posedge pixel_clk) rgb <= {8'd0, 8'(cx), 8'(cy)};
-    output logic [BIT_WIDTH-1:0] cx = START_X,
-    output logic [BIT_HEIGHT-1:0] cy = START_Y,
+    output logic [BIT_WIDTH-1:0] cx,
+    output logic [BIT_HEIGHT-1:0] cy,
 
     // The screen is at the upper left corner of the frame.
     // 0,0 = 0,0 in video
@@ -187,13 +187,16 @@ module hdmi
     output logic [BIT_HEIGHT-1:0] screen_height
 );
 
+initial cx = START_X;
+initial cy = START_Y;
+
 localparam int NUM_CHANNELS = 3;
 logic hsync;
 logic vsync;
 
-logic [BIT_WIDTH-1:0] hsync_pulse_start = HSYNC_PULSE_START, hsync_pulse_size = HSYNC_PULSE_SIZE;
-logic [BIT_HEIGHT-1:0] vsync_pulse_start = VSYNC_PULSE_START, vsync_pulse_size = VSYNC_PULSE_SIZE;
-logic invert = SYNC_INVERT;
+wire [BIT_WIDTH-1:0] hsync_pulse_start = HSYNC_PULSE_START, hsync_pulse_size = HSYNC_PULSE_SIZE;
+wire [BIT_HEIGHT-1:0] vsync_pulse_start = VSYNC_PULSE_START, vsync_pulse_size = VSYNC_PULSE_SIZE;
+wire invert = SYNC_INVERT;
 assign frame_width = FRAME_WIDTH, frame_height = FRAME_HEIGHT;
 assign screen_width = SCREEN_WIDTH, screen_height = SCREEN_HEIGHT;
 
