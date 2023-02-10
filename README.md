@@ -71,7 +71,7 @@ Other files of note:
 
     It's important to note that I use wrapper scripts for the
     commercial tools which at least use `nonet` (see
-    <https://bitbucket.org/darktjm/gamesup>) to disable phoning
+    <https://github.com/darktjm/gamesup>) to disable phoning
     home (or any other network access).  I suspect this is the
     reason that Vivado 2022 crashes so much (no testing for
     behavior on failure to access the network).  I won't even try
