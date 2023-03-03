@@ -264,7 +264,10 @@ do_yosys() {
     else
       echo "prep -flatten ${top:+-top $top};;;"
     fi
-    echo "write_json ${opref}raw.json"
+    # ecp5 leaves processes in what should be blackbox modules
+    # I have no idea how to fix this, so just drop it.
+    # Actually, so does Xilinx now.  May as well forget it.
+    #test ecp5 = "${arch[*]}" || echo "write_json ${opref}raw.json"
     if [ -n "$doadd" ]; then
       echo "techmap; opt -full; extract_fa;;;"
       echo write_json ${opref}fa.json
@@ -352,7 +355,7 @@ find_extra() {
 }
 for a in "${arch[@]}"; do
   o=${opref##*/}$a
-  cmd=(nextpnr-$a --timing-allow-fail --json ${o}.json ${delay:+--sdf ${o}.sdf --report ${o}-report.json} --write ${o}-pnr.json --ignore-loops)
+  cmd=(nextpnr-$a --timing-allow-fail --json ../${o}.json ${delay:+--sdf ${o}.sdf --report ${o}-report.json} --write ${o}-pnr.json --ignore-loops)
   case "$a" in
     gowin)
       for d in "${gwdev[@]}"; do
@@ -635,6 +638,7 @@ for a in "${arch[@]}"; do
             report_drc -file route_drc.rpt
             write_checkpoint -force route
 
+            set_property BITSTREAM.GENERAL.COMPRESS TRUE [current_design]
             write_bitstream -force $do.bit
 EOF
           docmd vivado -mode batch -nojournal -nolog -source build.tcl
@@ -692,6 +696,8 @@ EOF
 	docmd "$f2b" --part_file "$dbd/$rd/part.yaml" --part_name "${d%-*}" \
 	             --frm_file "${of}.frames" --output_file "${of}.bit"
       done
+      echo "all: { ${of}.bit }" >"${of}.bif"
+      docmd bootgen -arch zynq -image "${of}.bif" -process_bitstream bin
       if false; then
       # FIXME:  Add bootgen support
       (
@@ -706,9 +712,30 @@ EOF
         echo "}"
       ) >boot.bif
       # Default register inits: clocks, ethernet, SD, UART1
+      # Actually, the EBAZ ROM doesn't initialize any registers, so the FSBL
+      # is probably sufficient.
+      # In any case, limited to:
+      #UART 1     E000_1000 to E000_1FFC
+      #Quad-SPI   E000_D000 to E000_DFFC
+      #SMC        E000_E000 to E000_EFFC
+      #SDIO 0     E010_0004 to E010_0FFC except E010_0058
+      #DDR Memory F800_6000 to F800_6FFC
+      #PLL, Peripheral, AMBA and                         
+      #CPU clock controls
+      #           F800_0100 to F800_0234 except PS Reset Ctrl: F800_0200, Reserved: F800_01B0
+      #SWDT Reset F800_024C
+      #SWDT clock,
+      #TZ configuration,
+      #PS ID code,
+      #DDR configuration,
+      #MIO pins, SD card WP/CD
+      #routing    F800_0304 to F800_0834
+      #Reserved   F800_0A00 to F800_0A8C
+      #Reserved, GPIO and DDR I/O controls
+      #           F800_0AB0 to F800_0B74
       (
         echo "//  .set. 0xF8000120 = 0x1F000200;"
-	# note: expressions, decimal #s are allowed."
+	# note: expressions, decimal #s are allowed.
 	# ... up to 256 register inits
         # Recommended for fast NAND boot (1st line also for SD boot):
         # slcr.ARM_CLK_CTRL  Both    Both     0x1F000200 CPU divisor = 2 (433 MHz)

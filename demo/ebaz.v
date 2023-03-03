@@ -2,7 +2,7 @@
 //  Base board FPGA resources:
 //    Ethernet (just passthrough for PS7-Linux; no raw ethernet for this)
 `define test_eth // probably not a good idea to disable this
-//    Red/Green LEDs
+//    Red/Green LEDs (UART status if enabed; otherwise counter output)
 //    Optoisolated fan connectors: untested
 //    48 signals on 3 2mm DATA ports (to expansion board)
 //  CPU GPIO (64 bits; untested), IRQ (20 F->P 29P->F; untested), EV (untested)
@@ -114,7 +114,7 @@ module top(
 
 `ifdef test_eth,
   output wire CLK25, // For Ethernet, if no on-board XTAL (untested; mine has xtal)
-  `EBAZ_ETH_Ports
+  `EBAZ_ETH_PORTS
 `endif
 );
 
@@ -144,9 +144,6 @@ module top(
   BUFG bufg3 (.I(clk100_), .O(clk100));
 
   // ARM/PS7 interface
-  // TODO: look at ebaz kernel source and see if anything else needs
-  // forwarding.  For example, where do the R/G LEDs get driven from?
-  // Do the rear pushbuttons get forwarded?
   // Currently only ethernet forwarding and main system clock
 `ifdef test_eth
   `EBAZ_ETH_VLOG

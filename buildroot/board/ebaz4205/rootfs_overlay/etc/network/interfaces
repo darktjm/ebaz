@@ -1,0 +1,9 @@
+auto lo
+iface lo inet loopback
+
+auto eth0
+iface eth0 inet static
+        address 10.0.0.2
+        netmask 255.0.0.0
+	network 10.0.0.0
+	post-up ping -c 5 10.0.0.1 >/dev/null &

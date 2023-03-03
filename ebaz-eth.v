@@ -1,13 +1,24 @@
 `ifndef EBAZ_ETH_V
 `define EBAZ_ETH_V
 
+/*
+ * Note that the boot.bin I'm using for SD has the following GPIO aliases:
+ *  `PS7_GPIO_WIRES();
+ *   PS7(... `PS7_GPIO() ...)
+ *  wire led_r, led_b;
+ *  assign ps7_led_r = GPIOI[0];
+ *  assign ps7_led_g = GPIOI[1];
+ *  // assign GPIOTN[63:0] = ~64'b0;
+ *  // assign GPIOO[63:0] = 64'b0;
+ */
+
 `include "zynq-ps7.v"
 // Does not include setting CLK25 to 25MHz if xtal not present
 // (no way to really tell if it's necessary, so I'd have to always generate it)
 
 // Does not include ENET0 config such as 100Mbit mode and clock (25MHz
 // instead of 125, presumably).
-`define EBAZ_ETH_Ports \
+`define EBAZ_ETH_PORTS \
 inout wire ETH_MDIO, \
 input wire ETH_RXCLK, ETH_TXCLK, ETH_RXDV, \
 input wire [3:0] ETH_RXD, \

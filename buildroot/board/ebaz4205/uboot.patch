@@ -1,0 +1,205 @@
+diff --git a/arch/arm/dts/Makefile b/arch/arm/dts/Makefile
+old mode 100644
+new mode 100755
+index 4dfc2c6309..ed1dd384ec
+--- a/arch/arm/dts/Makefile
++++ b/arch/arm/dts/Makefile
+@@ -234,6 +234,7 @@ dtb-$(CONFIG_ARCH_ZYNQ) += \
+ 	zynq-zed.dtb \
+ 	zynq-zturn.dtb \
+ 	zynq-zturn-v5.dtb \
++	zynq-ebaz4205.dtb \
+ 	zynq-zybo.dtb \
+ 	zynq-zybo-z7.dtb
+ dtb-$(CONFIG_ARCH_ZYNQMP) += \
+diff --git a/arch/arm/dts/zynq-ebaz4205.dts b/arch/arm/dts/zynq-ebaz4205.dts
+new file mode 100755
+index 0000000000..5f257cf2b4
+--- /dev/null
++++ b/arch/arm/dts/zynq-ebaz4205.dts
+@@ -0,0 +1,185 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ *  Copyright (C) 2015 Andrea Merello <adnrea.merello@gmail.com>
++ *  Copyright (C) 2017 Alexander Graf <agraf@suse.de>
++ *
++ *  Based on zynq-zed.dts which is:
++ *  Copyright (C) 2011 - 2014 Xilinx
++ *  Copyright (C) 2012 National Instruments Corp.
++ *
++ */
++
++/dts-v1/;
++/include/ "zynq-7000.dtsi"
++
++/ {
++	model = "Zynq ebaz4205 Board";
++	compatible = "unknown,zynq-ebaz4205", "xlnx,zynq-7000";
++
++	aliases {
++		ethernet0 = &gem0;
++		serial0 = &uart1;
++		serial1 = &uart0;
++		// serial2 = &uart2;
++		mmc0 = &sdhci0;
++	};
++
++	memory@0 {
++		device_type = "memory";
++		reg = <0x0 0x10000000>;
++	};
++
++	chosen {
++		bootargs = "";
++		stdout-path = "serial0:115200n8";
++	};
++
++	gpio-leds {
++		compatible = "gpio-leds";
++		
++		led_r {
++			label = "led_r";
++			gpios = <&gpio0 54 1>;
++			linux,default-trigger = "heartbeat";
++		};
++
++		led_g {
++			label = "led_g";
++			gpios = <&gpio0 55 1>;
++			linux,default-trigger = "mmc0";
++		};
++	};
++
++	gpio-keys {
++		compatible = "gpio-keys";
++		autorepeat;
++
++		s2 {
++			label = "s2";
++			gpios = <&gpio0 20 1>;
++			linux,code = <102>;
++			wakeup-source;
++			autorepeat;
++		};
++
++		s3 {
++			label = "s3";
++			gpios = <&gpio0 32 1>;
++			linux,code = <116>;
++			wakeup-source;
++			autorepeat;
++		};
++	};
++	/*
++	// This is used by the default EBAZ firmware, but I don't want
++	// to use Xilinx secret sauce or implement poorly documented
++	// crap myself.
++	uart2: serial@42c00000 {
++		compatible = "xlnx,xps-uartlite-1.00.a";
++		reg = <0x42C00000 0x10000>;
++		interrupts = <0 29 1>;
++		port-number = <2>;
++		current-speed = <115200>;
++		use-parity = <0>;
++		data-bits = <8>;
++	};
++	*/
++};
++
++&clkc {
++	ps-clk-frequency = <33333333>;
++};
++
++&gem0 {
++	status = "okay";
++	phy-mode = "rgmii-id";
++	phy-handle = <&ethernet_phy>;
++
++	ethernet_phy: ethernet-phy@0 {
++		reg = <0x0>;
++		device_type = "ethernet-phy";
++	};
++};
++
++&sdhci0 {
++	status = "okay";
++};
++
++&uart0 {
++	status = "okay";
++};
++
++&uart1 {
++	status = "okay";
++};
++
++// Could enable w/ overlay, but I'm going to enable now to test
++&i2c0 {
++	status = "okay";
++};
++
++&i2c1 {
++	status = "okay";
++};
++
++&can0 {
++	status = "okay";
++};
++
++&can1 {
++	status = "okay";
++};
++
++&spi0 {
++	status = "okay";
++};
++
++&spi1 {
++	status = "okay";
++};
++
++// Probably renamed in newer kernels, just like nand0, but whatever.
++&smcc {
++	status = "okay";
++};
++
++// nand0 on older kernels; nfc0 on newer kernels (2022.2 at least)
++&nand0 {
++/*
++  // in ebaz default flash, but apparently not used
++  arm,nand-cycle-t0 = <5>;
++  arm,nand-cycle-t1 = <5>;
++  arm,nand-cycle-t2 = <2>;
++  arm,nand-cycle-t3 = <2>;
++  arm,nand-cycle-t4 = <2>;
++  arm,nand-cycle-t5 = <1>;
++  arm,nand-cycle-t6 = <2>;
++*/
++  status = "okay";
++  nand@0 {
++    reg = <0>;
++    #address-cells = <1>;
++    #size-cells = <1>;
++    // this is the default partition map
++    partition@nand-fsbl-uboot  { reg = <0          0x300000>; label = "nand-fsbl-uboot"; };
++    partition@nand-linux       { reg = <0x300000   0x500000>; label = "nand-linux"; };
++    partition@nand-device-tree { reg = <0x800000    0x20000>; label = "nand-device-tree"; };
++    partition@nand-rootfs      { reg = <0x820000   0xA00000>; label = "nand-rootfs"; };
++    partition@nand-jffs2       { reg = <0x1220000 0x1000000>; label = "nand-jffs2"; };
++    partition@nand-bitstream   { reg = <0x2220000  0x800000>; label = "nand-bitstream"; };
++    partition@nand-allrootfs   { reg = <0x2A20000 0x4000000>; label = "nand-allrootfs"; };
++    partition@nand-release     { reg = <0x6A20000 0x13E0000>; label = "nand-release"; };
++    partition@nand-reserve     { reg = <0x7E00000  0x200000>; label = "nand-reserve"; };
++    /*
++    partition@0         { reg = <0          0x300000>; label = "nand-fsbl-uboot"; };
++    partition@0x300000  { reg = <0x300000   0x500000>; label = "nand-linux"; };
++    partition@0x800000  { reg = <0x800000    0x20000>; label = "nand-device-tree"; };
++    partition@0x820000  { reg = <0x820000   0xA00000>; label = "nand-rootfs"; };
++    partition@0x1220000 { reg = <0x1220000 0x1000000>; label = "nand-jffs2"; };
++    partition@0x2220000 { reg = <0x2220000  0x800000>; label = "nand-bitstream"; };
++    partition@0x2A20000 { reg = <0x2A20000 0x4000000>; label = "nand-allrootfs"; };
++    partition@0x6A20000 { reg = <0x6A20000 0x13E0000>; label = "nand-release"; };
++    partition@0x7E00000 { reg = <0x7E00000  0x200000>; label = "nand-reserve"; };
++    */
++  };
++};

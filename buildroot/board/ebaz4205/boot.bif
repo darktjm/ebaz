@@ -1,0 +1,5 @@
+all: {
+  [bootloader] fsbl.elf
+  [alignment=64] eth.bit
+//  [alignment=64,load=0x4000000] u-boot.bin
+}

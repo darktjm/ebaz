@@ -1,0 +1,21 @@
+#!/bin/sh
+bb=
+for x in build-*/*.bit; do
+  test -n "$bb" && echo "Multiple bitfiles" && exit 1
+  bb="$x"
+done
+test -z "$bb" && echo "No bitstream" && exit 1
+
+ssh -n ebaz 'rm -f /tmp/*.bi[nt]'
+if ssh -n ebaz 'test -e /dev/xdevcfg'; then
+  scp "$bb" ebaz:/tmp
+  ssh -n ebaz "cat /tmp/"${bb##*/}" >/dev/xdevcfg"
+else
+  test ! -f "${bb}.bin" && echo "No bin file" && exit 1
+  # !!!! NOTE !!!! this requires /tmp to be the Linux kernel's firmwre dir.
+  # or, better yet, a subdir of the kernel's firmware dir.  Easiest way:
+  #    # mkdir -p /lib/firmware; ln -sf /tmp /lib/firmware/.
+  # on the SD card, I also recommmend "ln -sf /root /lib/firmware/."
+  scp "$bb".bin ebaz:/tmp
+  ssh -n ebaz "echo tmp/${bb##*/}.bin >/sys/class/fpga_manager/fpga0/firmware"
+fi
