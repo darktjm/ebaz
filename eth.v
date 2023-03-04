@@ -16,11 +16,10 @@ module top(
   assign GPIOI[63:0] = 64'b0;
 
   // I have a 25MHz crystal, so this is untested/unneeded for me.
-  // The default ebaz firmware uses a 125MHz clock.
-  // A /5 BUFR would probably be less expensive, but is unsupported by
-  // the free toolchain, as far as I can tell.
+  // The default ebaz firmware uses a 125MHz clock on fclk[0], but seems to
+  // have a 25MHz clock on fclk[1], so no PLL or divider is necessary,
   wire[3:0] fclk;
-  pll pll25 (.fclk(fclk[0]), .clk25(CLK25));
+  assign CLK25 = fclk[1];
 
   PS7 arm (
       .FCLKCLK(fclk),
