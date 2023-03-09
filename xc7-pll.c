@@ -321,9 +321,13 @@ int main(int argc, const char **argv)
 	    if(FCLKOUT[j])
 		c = ',';
 	int adj = i || !use_mmcm ? 1 : 8;
-	if(FCLKOUT[i])
-	    printf("\t%s%c // %g (%g) MHz\n",
-		   oname[i], c, FCLKOUT[i], fvco / CLKOUT_DIV[i] * adj);
+	if(FCLKOUT[i]) {
+	    printf("\t%s%c // %g", oname[i], c, fvco / CLKOUT_DIV[i] * adj);
+	    double pdiff = (fvco / CLKOUT_DIV[i] * adj - FCLKOUT[i]) * 100 / FCLKOUT[i];
+	    if(fabs(pdiff) >= 0.01)
+		printf(" (%+.2f%% of %g)", pdiff, FCLKOUT[i]);
+	    puts(" MHz");
+	}
     }
     printf("\t// VCO = %g / %d * %d%s = %g (%g-%g) MHz\n",
 	   FCLKIN1, CLKIN_DIV, CLKFB_DIV, use_mmcm ? " / 8" : "", fvco,
