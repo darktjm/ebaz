@@ -231,17 +231,18 @@ but the HDMI sound test doesn't produce any output, even though the
 same, identical code (except for what primitives are being used) works
 with both Gowin and Xilinx commercial tools.  The free tools provide
 no warnings or errors to indicate anything is wrong; it simply
-produces no output, and I don't feel like tracing it with a 'scope.
-In fact, I don't feel like wading through yet another poorly commercial
-tool chain to script it all, so I may just abandon the ECP5 for now.
-So, my question went from "what parts are fully supported by the free
-tools" to "what parts are supported well enough by the free tools" to
-"what free of charge vendor tools are usable".  The answer to the
-former two questions is apparently "none":  the free tools are not
-ready for prime time, and I am not willing to fix them myself right
-now so that they are.  The answer to the latter question is "Only
-Gowin supports all parts and features, and also documents the
-scripting in a usable manner".
+produces no output, and I don't feel like tracing it with a 'scope. In
+fact, I don't feel like wading through yet another poorly documented
+(if at all; I have yet to find actual useful documentation on the
+Xilinx tools) commercial tool chain to script it all, so I may just
+abandon the ECP5 for now. So, my question went from "what parts are
+fully supported by the free tools" to "what parts are supported well
+enough by the free tools" to "what free of charge vendor tools are
+usable".  The answer to the former two questions is apparently "none":
+the free tools are not ready for prime time, and I am not willing to
+fix them myself right now so that they are.  The answer to the latter
+question is "Only Gowin supports all parts and features, and also
+documents the scripting in a usable manner".
 
 I despise Python with the passion of a thousand fiery suns.  The
 language (uncompilable, whitespace as a control structure, other
