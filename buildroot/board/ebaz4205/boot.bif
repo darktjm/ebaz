@@ -1,5 +1,7 @@
 all: {
-  [bootloader] fsbl.elf
-  [alignment=64] eth.bit
-//  [alignment=64,load=0x4000000] u-boot.bin
+  // bootgen doesn't support raw .bin file for fsbl.  Only ELF.  What a
+  // piece of shit.
+  [bootloader] ../../board/ebaz4205/fsbl.elf
+  [alignment=64] ../../board/ebaz4205/eth.bit
+  [alignment=64,load=0x4000000,startup=0x4000000] ../../output/images/u-boot.bin
 }

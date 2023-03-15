@@ -1,203 +1,343 @@
 EBAZ4205 Miscellany
 ===================
 
-This is currently just some miscellaneous stuff I wish to share
-publicly related to the EBAZ4205 bit-mining control board, which I use
-as a Zynq 7010 FPGA development platform.  Keep in mind that before I
-had a stupid idea to do something on an FPGA mid-March 2022, I
-didn't know jack about FPGAs or anything related to them, other than a
-vague awareness of their existence.  It's been more than 30 years
-since I was an electronics hobbyist on my aborted EE path.
+This is currently just some miscellaneous stuff related to the
+EBAZ4205 bit-mining control board, which I use as a Zynq 7010 FPGA
+development platform.  I am not a professional, and I stepped off of
+the EE path and hobby more than 30 years ago.  My training consists of
+reading data sheets and language standards, as well as looking at
+other people's code, off and on since mid-March 2022.  My original
+goal was to create an educational workflow involving automatic free
+tools, but that has not panned out very well.  If I ever revive that,
+or get going on another, unrelated project, I might delete this
+repository in favor of integrating the results with those.
 
-This repository may disappear at any time, since it is only a
-sub-project of a larger (not yet public) FPGA-related project, and I
-might merge it with that.  That project is stalled for now, though.
-The stall is both for technical issues and a slight divergence into
-another side project, which is even larger in some respects.
+I also own and use an expansion board which I cannot identify.  It has
+3 images of a cartoon girl (two large and one small) on the rear, if
+that helps.  I got it from the JSSHENGZHI store on AliExpress.  See
+`hdmi-lcd-board-schem.jpg` for a schematic (a merge of the two images
+provided on the AliExpress product page,
+<https://www.aliexpress.us/item/3256804274079996.html>; I will make no
+attempt to ensure this link stays alive).  The board provides a USB
+serial port (and power derived from it), an optional 256x256 LCD
+display, an HDMI connector, some buttons, some LEDs, a single-wire
+buzzer, and a .1" connector for unused USER port pins (compared to the
+2mm pins of the EBAZ itself, this is much more convenient).  It costs
+about as much as pre-made 2->2.54mm adapters made for it, so it seems
+like a good deal.
 
-I also own and use an expansion board which I cannot identify.  I got
-it from the JSSHENGZHI store on AliExpress.  See
-`hdmi-lcd-board-schem.jpg` for a schematic (pulled from the AliExpress
-product page, <https://www.aliexpress.us/item/3256804274079996.html>;
-I will make no attempt to ensure this link stays alive) and combined
-from 2 images into 1 for convenience).
+Building Bitstreams
+===================
 
-Other files of note:
+When I first started, things were simple, and so I created a
+relatively simple wrapper script to do everything.  In the mean time,
+things have gotten much more complex, so `fpgasynth` has grown out of
+control.  I will probably replace this some day, but I'm too occupied
+with other things at the moment.  I sort of like the idea of having a
+separate configuration utility, rather than command-line options or
+commented lines in a script, but `cmake` is too focused on traditional
+compilation, and kernel config, as used by `buildroot` and the ESP32
+IDF, requires too much extra work for each new project, and I can't
+really think of anything else.  I certainly won't use `scons` or
+anything else Python-based (which, technically, includes the ESP32
+IDF, I guess).
 
-  - `ebaz.xdc` - physical constraints for all available board
-    resources.  Naturally, to use this, you will either need to
-    ensure constraint errors are just warnings, or hand-edit it
-    for every project.  I don't like hand-editing stuff that
-    should be "standard", so I choose the former option.
+There is on-line help (`-h` option) and an example.  Probably the main
+arguments to get started with the EBAZ4205 are `-X z` to select the
+Zynq 7010 and `-o whatever` to select an output base name.  All other
+arguments can just be Verilog or VHDL files.  Since I'm going to
+rewrite it, and I really ought to distribute it as a separate project,
+rather than part of this one, that will have to do for documentation.
+I have actually left out `mk_testrig.sh` and `testrig.v` (used while I
+was trying to see if open cores would compile at all with
+`yosys`+`nextpnr`) and `fa2add.jq`, which I was using to experiment
+with adding carry chains to manually implemented adders (part of my
+original purpose for getting into FPGAs was to allow drawing of
+schematics to produce circuits, including manual implementations of
+adders).
 
-    Note that this does not include timing constraints.  For the free
-    tools in particular, there is no way to provide a common file.
-    For Vivado, the PLLs auto-create clocks, so it probably isn't
-    necessary for simple projects.  Really, though, I have no idea
-    what I'm doing timing-wise, and should probably do more research.
-    Timing constraints may well be the reason for inconsistently bad
-    behavior of the HDMI demo.
+I originally wanted to only support free software toolchains, `yosys`
+and `nextpnr` in particular, but they have proven inadequate.  The
+first to fall was Gowin, for which the free tools (based on apicula)
+simply lack far too many primitives I am actualy interested in.  The
+fact that the full, unlimited commercial toolchain was available free
+of charge (with registration) helped as well.  Later I also found that
+the commercial toolchain produced output with signifiantly lower
+resource utilization, making me wonder of `yosys` (or probably more
+precisely `abc`) optimizes at all.  Once I finally got my first
+bitstream for Xilinx parts via f4pga, I was happy, until I realized
+that it, too lacked many features, and produced lower quality output,
+so I ended up using Vivado instead.  In fact, given my other gripes
+about f4pga, I completely removed f4pga support in favor of Vivado
+and `nextpnr-xilinx`.  Unfortunately, Vivado wants to call home, and
+only supports a limited subset of parts, but at least it does support
+the Zynq 7010 fully, I guess.  Recently I also had issues with Lattice
+parts, but I don't really remember what in particular, and I can't get
+Diamond to work, so it's really the only one that has no commercial
+toolchain support.  Note that `yosys` is still used even with the
+commercial toolchains, to do a bit of preprocessing.  It is also
+possible to force the use of `yosys`+`nextpnr` with the `-y` flag.
 
-    I guess placing comments after lines doesn't work as I would
-    expect (maybe that's not legal TCL?), because Vivado gives
-    warnings about it.  I used to say "just ignore them", but I've
-    gone ahead and put the comments on the next line.
+It's important to note that I use wrapper scripts for the commercial
+tools which at least use `nonet` (see
+<https://github.com/darktjm/gamesup>) to disable phoning home (or any
+other network access).  I have softened my stance on Vivado 2022.2,
+since it crashes at the last minute without network access (although
+`tcpdump` doesn't indicate that it's actually phoning home, I suspect
+it actually is, or will when I'm not looking).  It had to be done in
+order to actually get at least something working.  Hopefully
+`nextpnr-xilinx` will improve to the point where I will no longer feel
+the need to use Vivado.
 
-  - `fpgasynth` - this is my generic wrapper program for converting
-    source to bitstreams.  Originally, I only wanted to support `yosys`
-    and `nextpnr` with Verilog source.  As I was playing with open
-    cores, I added VHDL support.  In generally, as my needs grew, so did
-    the script.  It's become unmanageable, so I will eventually
-    rewrite it.  Maybe once I finally get some basics working right.
-    This replaces my old `mkebaz` script now, as well.  For Xilinx, it
-    supports Vivado and `nextpnr-xilinx` (don't know what version; I just
-    keep git up-to-date for now).  I used to support f4pga, but since it
-    produced bad results (and didn't support everything it should to begin
-    with) in my tests, I have removed it entirely from my system.  Since
-    `nextpnr-xilinx` also can't produce usable output most of the
-    time, I made Vivado the default, and recommend using it unless you're
-    feeling masochistic.
+Constraints
+-----------
 
-    There is on-line help (`-h` option) and an example.  Since I'm
-    going to rewrite it, and I really ought to distribute it as a
-    separate project, rather than part of this one, that will have to
-    do for documentation.  I have actually left out `mk_testrig.sh`
-    and `testrig.v` (used while I was trying to see if open cores
-    would compile at all with `yosys`+`nextpnr`) and `fa2add.jq`,
-    which I was using to experiment with adding carry chains to
-    manually implemented adders (part of my original purpose for
-    getting into FPGAs was to allow drawing of schematics to produce
-    circuits, including manual implementations of adders).
+The `ebaz.xdc` file documents all available I/O on both the main
+EBAZ4205 board and the above-mentioned expansion board.  I don't like
+the idea of having to reproduce this for every project, so I have
+taken steps to ensure that constraint errors are just warnings.  Hand
+editing is also an option, though; you can just consider this a useful
+reference guide.  I mean, if you want to adapt existing code, you'll
+have to change the names, anyway.
 
-    It's important to note that I use wrapper scripts for the
-    commercial tools which at least use `nonet` (see
-    <https://github.com/darktjm/gamesup>) to disable phoning
-    home (or any other network access).  I suspect this is the
-    reason that Vivado 2022 crashes so much (no testing for
-    behavior on failure to access the network).  I won't even try
-    without:  sorry, no phoning home for you.
+Note that this does not include timing constraints.  For the free
+tools in particular, there is no way to provide a common file. For
+Vivado, the PLLs auto-create clocks, so it probably isn't necessary
+for simple projects.  Really, though, I have no idea what I'm doing
+timing-wise, and should probably do more research. Timing constraints
+may well be the reason for inconsistently bad behavior of the HDMI
+demo.
 
-  - `xc7pll.c` - source for a simple PLL generator.  I used
-    Verilog to implement this for the Gowin FPGAs, but the code
-    was dog slow for anything else, so I rewrote it in C.  Less
-    convenient to use, but adequate for now.  Probably the main useful
-    feature missing still is the ability to generate register sets for
-    dynamic configuration.  This will be important for dynamic HDMI
-    resolution changing.  Or I could just generate a fixed list of
-    clocks and switch between them, probably.
+I guess placing comments after lines doesn't work as I would expect
+(maybe that's not legal TCL?), because Vivado gives warnings about it.
+I used to say "just ignore them", but I've gone ahead and put the
+comments on the next line.
 
-    For example:
+PLLs
+----
+
+I used to have a parameterized Verilog PLL wrapper, but somewhere
+along the line one of the versions (maybe Xilinx, maybe ECP5) took way
+too long to produce an answer with the free tools, so I switched to
+using a generator program instead (the same algorithm, but subsecond
+execution time instead of several minutes).  It's less convenient to
+use, but adequate until I can figure out how to make a more optimal
+Verilog version.  I can't use GHDL/VHDL or SystemVerilog/Surelog for
+this, because the respective `yosys` plugins do not support generic
+parameters, at least as far as I can tell at the time of writing.
+
+`xc7pll.c` is the source code; just compile into an executable in the
+usual way.  Probably the main useful feature missing still is the
+ability to generate register sets for dynamic configuration.  This
+will be important for dynamic HDMI resolution changing.  Or I could
+just generate a fixed list of clocks and switch between them,
+probably.  In fact, I will probably convert this into a library
+routine that can be called fromm a processor-side utility to send the
+paraemeters to the FPGA side.
+
+Some example usages:
 
 >       xc7-pll FCLKIN1=125 FCLKOUT0=25 CLKIN1name=fclk CLKOUT0name=clk25 >pll.v
 >       xc7-pll -m modname=vidpll FCLKIN1=125 FCLKOUT1=371.25 FCLKOUT0=74.25 \
->                  CLKIN1name=fclk CLKOUT0name=clk_pixel \
->                  CLKOUT1name=clk_shift >vid-pll.v
+>               CLKIN1name=fclk CLKOUT0name=clk_pixel \
+>               CLKOUT1name=clk_shift >vid-pll.v
 
-  - `zynq-ps7.v` - macro library to assist in using the PS7
-    component.  This macro library does not work properly in
-    Vivado.  I moved the raw semicolon out of the macro
-    definitions, which makes it at least work in System Verilog
-    mode on 2022.2.  2022.2 crashes a lot if I wrap it in `nonet`, so
-    I've disabled the wrapper for now.  It doesn't appear to call home,
-    anyway, so I'm not even sure why it crashes.  2017.2 does not crash,
-    but it doesn't like the macros no matter what.  A workaround, which
-    I used to do in my scripts, is to use a preprocessor like
-    `verilator -P -E`.  I initially implemented automatic preprocessing
-    in `fpgasynth`, but backed out because I really don't like
-    managing files this way. 
+Processor Interface
+-------------------
 
-  - `ebaz-eth.v` - macro library to easily add raw ethernet
-    forwarding.  Depends on `zynq-ps7.v`.  `eth.v` is a sample
-    top-level using these macros, as well as (maybe) supplying the
-    25MHz clock for boards missing the crystal oscillator.  I say
-    maybe because my board has the oscillator, so I haven't really
-    tested if it works.  To build:
+`zynq-ps7.v` is a macro library to assist in using the PS7 component.
+This macro library does not work properly in Vivado.  I moved the raw
+semicolon out of the macro definitions, which makes it at least work
+in System Verilog mode on 2022.2.  2017.2 doesn't like the macros no
+matter what.  A workaround, which I used to do in my scripts, is to
+use a preprocessor like `verilator -P -E`.  I initially implemented
+automatic preprocessing in `fpgasynth`, but backed out because I
+really don't like managing files this way. 
 
->       ./fpgasynth -X z -o ebaz -t top eth.v
+`ebaz-eth.v` is a macro library which uses `zynq-ps7.v` to easily add
+raw ethernet forwarding.  `eth.v` is a sample top-level using these
+macros, as well as (maybe) supplying the 25MHz clock for boards
+missing the crystal oscillator.  I say maybe because my board has the
+oscillator, so I haven't really tested if it works. To build:
+
+>       ./fpgasynth -X z -o ebaz eth.v
 >       ./prgebaz
 
-  - `ysv-supt.v` - macro library to assist in one of the issues porting
-    SystemVerilog code to yosys-native (rather than the Surelog
-    plugin).  See `demo/hdmi` for example usage.  While this fixes the
-    yosys array access errors, the HDMI code still does not work with
-    the free tool chain.
+Other
+-----
 
-  - `demo` - against my better judgment, I have included my
-    simple demo which exercises the components I want: LEDs,
-    push buttons, expansion connector (H4), speaker, LCD, USB UART
-    (echos @115200), ethernet pass through, and HDMI.  There seems to
-    be an issue with the LCD back light, even though another demo I
-    have (the ulx3s-misc collatz example ported to the ebaz) seems to
-    work, at least in that regard.  Parts were taken from other
-    projects which were independently verified as working, to
-    eliminate possible errors on my part (but I still managed to sneak
-    an error into the UART code):
-      - LCD support: <https://github.com/emard/ulx3s-misc> spi_display example
-      - HDMI with audio support: <https://github.com/hdl-util/hdmi> with
-        some modifications by me.  It's System Verilog, not supported by
-	yosys directly.  I will (re-)port it to something more yosys-friendly
-	at some point, but I can't use f4pga to make working HDMI, anyway,
-	so I've only made minor modifications.
-      - UART: <https://github.com/jamesbowman/swapforth> j1b (with
-	broken merge in progress of j1a/j1b by me)
-    These include minor patches to fix compilation issues with Vivado
-    and/or f4pga.
+`yosys` doesn't support full SystemVerilog by default, and the
+`systemverilog` plugin I am aware of (using `Surelog`) does not
+support parameterization, among other issues.  `ysv-supt.v` is a macro
+library to assist in one of the issues porting SystemVerilog code to
+yosys-native. See `demo/hdmi` for example usage.  While this fixes the
+`yosys` array access errors, the HDMI code still does not work with
+the free tool chain.
+
+Processor Side
+==============
 
 Booting
 -------
 
-I have successfully booted from SD card (instead of moving the
-resistor, I patched a resistor to a non-connected pin on the JTAG
-header, and use a jumper from that pin to either VCC or GND pins on
-the same header to switch between boot modes).  I currently prefer to
-just boot from flash - see
-<https://github.com/xjtuecho/EBAZ4205#reset-the-root-password-of-built-in-linux>
+See <https://github.com/xjtuecho/EBAZ4205#reset-the-root-password-of-built-in-linux>
 for decent instructions on how to boot from the pre-loaded flash.  In
 summary, disable the bit-miner software and set up the network the way
 you like it.
 
-Part of the reason I prefer the default flash is that the kernel has
-the old `/dev/xcdevcfg` device for programming the FPGA:
+Technically, you don't need to configure the CPU to boot from SD by
+default; instead, you can change the flash configuration.  However, I
+have not had much success, so I have gone the hardware route.
+Instead of moving the resistor to permanently change the default boot
+mode, I patched a resistor to a non-connected pin on the JTAG header,
+and use a jumper from that pin to either VCC or GND pins on the same
+header to switch between boot modes).  Too bad Xilinx didn't feel the
+need to fall back in case of failure, or such switching would not be
+necessary.
+
+While I have not been able to replace the first partition of the flash
+(essentially a Xilinx `boot.bin` containing the FSBL, an initial
+bitstream, and U-Boot), replacing the rest works fine.  My flash now
+boots a 5.15 kernel (Xilinx v2022.2 from
+<https://github.com/Xilinx/linux-xlnx>) and a device tree which
+contains additional entries for LED and rear pushbutton support (at
+least partially lifted from <https://github.com/blkf2016/ebaz4205>).
+
+My first SD card boot used the image from
+<https://github.com/blkf2016/ebaz4205>.  I still use the `boot.bin`,
+but I have replaced/updated most other compoennts (see below).  In
+particular, booting now uses U-Boot xilinx-v2022.2 (from
+<https://github.com/Xilinx/u-boot-xlnx) and the kernel and device tree
+mentioned above.
+
+As implied by both of the previous paragraphs, I have yet to generate
+a functional `boot.bin` myself.  Every attempt results in absolute
+silence, as if there is a problem with the FSBL.  I have tried
+building from the official sources at
+<https://github.com/Xilinx/embeddedsw>, extracting the FSBL from
+working `boot.bin`s (including the one on the default flash), building
+with minor changes, building with major changes such as those from
+<https://github.com/Halolo/ebaz4205-distro>, building older versions,
+building newer versions, etc.  Nothing works.  I have compared the
+`boot.bin` headers I generated (using the official `bootgen` utility
+from Xilinx from <https://github.com/Xilinx/bootgen>), with no notable
+differences.  I have no idea what's wrong, and haven't the means or
+patience to deal with it any more.
+
+Linux
+-----
+
+The version of Linux on the flash is old, but probably adequate for
+most purposes.  It can be replaced, though.  In particular, I have
+already replaced the kernel (in `nand-linux`, aka `/dev/mtdpart1`) and
+the device tree (in `nand-device-tree`, aka `/dev/mtdpart2`).  The
+device tree binary can simply be copied directly.  Since the default
+U-Boot expects it, you will have to package the kernel using `mkimage`
+first:
+
+>       mkimage -A arm -O linux -T kernel -a 02080000 -e 02080000 -n Linux -C none -d zImage uImage
+
+There is nothing special about the rest of the default partitions, so
+I would recommend wiping them all out and starting from scratch.  The
+only ones that matter are the first three, and if you somehow manage
+to replace the first one (i.e., using a working `boot.bin` with a
+different U-Boot), you can resize the first one and do whatever you
+want with the rest of the flash.   My original intent was to dedicate
+part of the flash for the FPGA to use, but it's probably easier to
+just use the SD card for that.
+
+For the SD card, and also to build the cross-compile toolchain,
+kernels, U-Boot, and device trees for the above work, I currently use
+`buildroot`.  I started with the configuration from
+<https://github.com/blkf2016/ebaz4205>, but have redone most of it
+from scratch, including some major updates.  I was not able to use the
+plain versions of the kernel or U-Boot, or, for that matter, the
+Xilinx git heads, so I used xilinx-v2022.2.  I think Xilinx forgot to
+send some things upstream.  As mentioned above, the `boot.bin` is the
+only thing I have yet to replace.  You can probably see the results of
+my work in the `buildroot` subdirectory, but I haven't checked to see
+if you can actually build everything from scratch using what's there,
+or if I've forgotten something.  I may clear that up some day.
+
+I tried building yocto/OpenEmbedded using
+<https://github.com/Halolo/ebaz4205-distro>, but I failed.  The entire
+ecosystem is infested with broken Python, so I have little enthusiasm
+for fixing it.  The only thing of interest I tried to extract, namely
+an alternate way to build the FSBL, I was not able to get running,
+either, so it's a wash.
+
+I have not tried PetaLinux or any of the raw Xilinx distros.  I really
+don't care too much about what sort of Linux is running, just so I can
+run my FPGA support programs on it.  In fact, I don't really need
+Linux for that; in some cases, Linux just gets in the way (e.g. the
+SPI API is awful, requiring the writing of a kernel device driver to
+get anything done.  I also have to use `mem=` to reserve a contiguous
+chunk of memory without resorting to a device driver).
+
+FPGA Programming
+----------------
+
+The default flash kernel supports very easy programming, if you also
+enable passwordless SSH access:
 
 >       scp build-*/*.bit ebaz:/tmp && ssh -n ebaz "cat /tmp/*.bi? >/dev/xdevcfg"
 
-I have added my `prgebaz` script that I use to upload an image.  It
-probably at least needs the host name changed.
+Note that I copy to `/tmp` first so that temporary (or permanent,
+depending on the bitstream) network loss won't cause partial bitstream
+loss.
 
-I have made an SD card image using `buildroot`, partially based on
-<https://github.com/blkf2016/ebaz4205>.  I made a number of changes to
-the configuration; see the `buildroot` sub-directory.  I also attempted
-(so far unsuccessfully) to build a `boot.bin` from scratch.  Instead,
-I continue to use the one from the aforementioned site.  The
-bitstream is `eth.v`, compiled using `yosys` and `nextpnr-xilinx`,
-and the main payload is `u-boot` generated by `buildroot`.  Just as
-with the default ROM, no registers are adjusted before the fsbl is
-loaded.  The missing component is the fsbl itself
-(<https://github.com/Xilinx/embededsw>), which I can't seem to make
-properly.  Do not use the `fsbl.elf` or the `boot.bin` generated with
-it; the fsbl will not start, even though it compiled without errors
-after much effort.  While the `boot.bin` from the afore-mentioned
-project is sufficient for SD card booting, my inability to replace the
-FSBL may make it impossible to fully replace the default flash image.
+The kernel from <https://github.com/blkf2016/ebaz4205> does not
+support sysfs firmware updates.  There is a way to update via the
+device tree, but I don't want to mess with it.  Check the Xilinx wiki
+for instructions on how to do this.  Since I don't want to encourage
+this, I won't even give you the link.  Look for it yourself.
 
-While I suppose it might have been possible to use the device tree
-overlay method Xilinx describes in its wiki to program using the
-supplied SD card file system image from
-<https://github.com/blkf2016/ebaz4205>, I instead enabled support for
-programming through sysfs.  See `prgebaz` for the method I used.  I
-also updated `fpgasynth` to invoke `bootgen` (from
-<https://github.com/Xilinx/bootgen>) to generate the necessary file
-format.  I was unable to use non-Xilinx kernels, or, for that matter,
-Xilinx' git head, so I used `xilinx-v2022.2` from
-<https://github.com/Xilinx/linux-xlnx>.  I think Xilinx forgot to send
-some things upstream.
- 
+Instead, I use a kernel which *does* support sysfs firmware updates.
+It's still not as easy to do an update as with the old kernels, but
+it's much easier than without.  First, you need to format your
+bitstream using `bootgen`; I have updated `fpgasynth` to do this
+automatically.  The resulting file will generally have a `.bin`
+extension, rather than `.bit`.  The next step is to place this file
+under `/lib/firmware` on the ebaz.  I do this by creating soft links
+to `/root` and `/tmp`, so that I can copy the bitstream to either
+directory for upload.  Then, just echo the path (minus
+`/lib/firmware`) into the sysfs file.  I have included my `prgebaz`
+script, which works with either the original or new programming style
+(but not the device tree method).  If you want to use it, you'll
+probably have to at least change the target host name.
+
+Demo Program
+============
+
+Against my better judgment, I have included a demo that I use to
+exercise the board(s).  As you might expect, it's in the `demo`
+subdirectory.  It currently exercises LEDs, pushbuttons, the .100
+expansion connector (H4), speaker, LCD, USB UART (echos @115200),
+ethernet pass-through, and HDMI.  There seems to be an issue with the
+LCD back light, even though another demo I have (the ulx3s-misc
+collatz example ported to the ebaz) seems to work, at least in that
+regard.  Parts were taken from other projects which were independently
+verified as working, to eliminate possible errors on my part (but I
+still managed to sneak an error into the UART code):
+
+ - LCD support: <https://github.com/emard/ulx3s-misc> spi_display example
+
+ - HDMI with audio support: <https://github.com/hdl-util/hdmi> with
+   some modifications by me.  It's System Verilog, not supported by
+   `yosys` directly.  I will (re-)port it to something more
+   `yosys`-friendly at some point, but I can't use f4pga to make
+   working HDMI, anyway, so I've only made minor modifications.
+
+- UART: <https://github.com/jamesbowman/swapforth> `j1b` (with broken
+  merge in progress of `j1a`/`j1b` by me)
+
+These include minor patches to fix compilation issues.
+
 My grumbling; feel free to ignore
----------------------------------
+=================================
 
 Probably my biggest disappointment is that I had to resort to
-commercial tools for this (and Gowin support, and, more recently, even
-for Lattice ECP5 support).  I was under the impression that the free
+commercial tools for this.  I was under the impression that the free
 tools were at least mostly ready; it appears that I was misled.  It
 really only works for simple demos.  With luck, you might get other
 stuff to work as well (barely).  In the case of Gowin, it is missing
@@ -224,25 +364,14 @@ sorts).  Both vendors like to force you to use proprietary IP blocks
 plague that they are, until of course I find a need for one and have
 to capitulate yet again.
 
-Addendum to prev. paragraph, Feb. 2023:  And now, the last one has
-fallen.  Even the Lattice ECP5 doesn't work right with the free tools,
-as far as I can tell.  I have yet to build a bitstream with Diamond,
-but the HDMI sound test doesn't produce any output, even though the
-same, identical code (except for what primitives are being used) works
-with both Gowin and Xilinx commercial tools.  The free tools provide
-no warnings or errors to indicate anything is wrong; it simply
-produces no output, and I don't feel like tracing it with a 'scope. In
-fact, I don't feel like wading through yet another poorly documented
-(if at all; I have yet to find actual useful documentation on the
-Xilinx tools) commercial tool chain to script it all, so I may just
-abandon the ECP5 for now. So, my question went from "what parts are
-fully supported by the free tools" to "what parts are supported well
-enough by the free tools" to "what free of charge vendor tools are
-usable".  The answer to the former two questions is apparently "none":
-the free tools are not ready for prime time, and I am not willing to
-fix them myself right now so that they are.  The answer to the latter
-question is "Only Gowin supports all parts and features, and also
-documents the scripting in a usable manner".
+So, my question went from "what parts are fully supported by the free
+tools" to "what parts are supported well enough by the free tools" to
+"what free of charge vendor tools are usable".  The answer to the
+former two questions is apparently "none": the free tools are not
+ready for prime time, and I am not willing to fix them myself right
+now so that they are.  The answer to the latter question is "Only
+Gowin supports all parts and features, and also documents the
+scripting in a usable manner".
 
 I despise Python with the passion of a thousand fiery suns.  The
 language (uncompilable, whitespace as a control structure, other
@@ -265,7 +394,7 @@ Popular, but impossible to actually write good code in.
 
 "F4PGA:  The GCC of FPGAs".  Right.  Not only is it not a standalone
 project (all components except for the crappy Python glue code come
-from elsewhere, although the yosys plugins are essentially part of
+from elsewhere, although the `yosys` plugins are essentially part of
 f4pga as well), but it's extremely poorly documented (an example can
 supplement, but not replace actual documentation, and forcing people
 to use your poorly written makefiles is inadequate at best) with
@@ -289,7 +418,7 @@ how many other missing primitives (it's not worth my time to make a
 comprehensive list, like I did for Gowin parts).  Plus apparently even
 if it were there, `MMCME2_ADV` is producing incorrect results.  At
 least it supports the all-important PS7 primitive, without which there
-would be no clocks (or ethernet pass through, which makes programming
+would be no clocks (or ethernet pass-through, which makes programming
 easier).
 
 Unfortunately, even though `nextpnr-xilinx` is much faster and produces
@@ -323,7 +452,7 @@ Plus even more bullshit, like the xc7a35t artificial limitations in the
 commercial tool chain (i.e., it's really an xc7a50t hardware-wise).
 
 License Information
--------------------
+===================
 
 As with all of my software in the past few years, everything in this
 repository is in the Public Domain, except as noted for specific files

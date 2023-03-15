@@ -1,69 +1,11 @@
 # From EBAZ flash
 #setenv bootcmd 'run $modeboot'
-#setenv bootdelay '3'
-#setenv baudrate '115200'
 #setenv ipaddr '192.168.0.115'
 #setenv serverip '192.168.0.104'
 #setenv gatewayip '192.168.0.1'
 #setenv ethaddr '00:0a:35:00:01:22'
-#setenv kernel_image 'uImage'
-# buildroot default is 0x2000000, but this will probably do
-setenv kernel_load_address 0x2080000
-#setenv ramdisk_image 'uramdisk.image.gz'
-#setenv ramdisk_load_address '0x4000000'
-#setenv devicetree_image 'devicetree.dtb'
-# buildroot default is 0x1f00000, but this will probably do
-setenv devicetree_load_address 0x2000000
-#setenv bitstream_image 'system.bit.bin'
-#setenv boot_image 'BOOT.bin'
-#setenv loadbit_addr '0x100000'
-#setenv loadbootenv_addr '0x2000000'
-setenv kernel_size 0x500000
-setenv devicetree_size 0x20000
-#setenv ramdisk_size '0xA00000'
-#setenv boot_size '0xF00000'
-#setenv fdt_high '0x20000000'
-#setenv initrd_high '0x20000000'
-#setenv bootenv 'uEnv.txt'
-#setenv loadbootenv 'load mmc 0 ${loadbootenv_addr} ${bootenv}'
-#setenv importbootenv 'echo Importing environment from SD ...; env import -t ${loadbootenv_addr} $filesize'
-#setenv sd_uEnvtxt_existence_test 'test -e mmc 0 /uEnv.txt'
-#setenv preboot 'if test $modeboot = sdboot && env run sd_uEnvtxt_existence_test; then if env run loadbootenv; then env run importbootenv; fi; fi;'
-#setenv mmc_loadbit 'echo Loading bitstream from SD/MMC/eMMC to RAM.. && mmcinfo && load mmc 0 ${loadbit_addr} ${bitstream_image} && fpga loadb 0 ${loadbit_addr} ${filesize}'
-#setenv norboot 'echo Copying Linux from NOR flash to RAM... && cp.b 0xE2100000 ${kernel_load_address} ${kernel_size} && cp.b 0xE2600000 ${devicetree_load_address} ${devicetree_size} && echo Copying ramdisk... && cp.b 0xE2620000 ${ramdisk_load_address} ${ramdisk_size} && bootm ${kernel_load_address} ${ramdisk_load_address} ${devicetree_load_address}'
-#setenv qspiboot 'echo Copying Linux from QSPI flash to RAM... && sf probe 0 0 0 && sf read ${kernel_load_address} 0x100000 ${kernel_size} && sf read ${devicetree_load_address} 0x600000 ${devicetree_size} && echo Copying ramdisk... && sf read ${ramdisk_load_address} 0x620000 ${ramdisk_size} && bootm ${kernel_load_address} ${ramdisk_load_address} ${devicetree_load_address}'
-#setenv uenvboot 'if run loadbootenv; then echo Loaded environment from ${bootenv}; run importbootenv; fi; if test -n $uenvcmd; then echo Running uenvcmd ...; run uenvcmd; fi'
-#setenv sdboot 'if mmcinfo; then run uenvboot; echo Copying Linux from SD to RAM... && load mmc 0 ${kernel_load_address} ${kernel_image} && load mmc 0 ${devicetree_load_address} ${devicetree_image} && load mmc 0 ${ramdisk_load_address} ${ramdisk_image} && bootm ${kernel_load_address} ${ramdisk_load_address} ${devicetree_load_address}; fi'
-#setenv usbboot 'if usb start; then run uenvboot; echo Copying Linux from USB to RAM... && load usb 0 ${kernel_load_address} ${kernel_image} && load usb 0 ${devicetree_load_address} ${devicetree_image} && load usb 0 ${ramdisk_load_address} ${ramdisk_image} && bootm ${kernel_load_address} ${ramdisk_load_address} ${devicetree_load_address}; fi'
-setenv nandboot 'echo Copying Linux from NAND flash to RAM... && nand info && run nandroot;nand read 0x100000 0x2220000 0x300000 && fpga loadb 0 0x100000 0x300000 && nand read ${kernel_load_address} 0x300000 ${kernel_size} && nand read ${devicetree_load_address} 0x800000 ${devicetree_size} && bootm ${kernel_load_address} - ${devicetree_load_address}'
-setenv nandroot 'setenv bootargs "console=ttyPS0,115200 root=/dev/mtdblock6 rootfstype=jffs2 noinitrd rw rootwait"'
-#setenv nandboot0 'echo Copying Linux from NAND flash to RAM... && nand read ${kernel_load_address} 0x300000 ${kernel_size} && nand read ${devicetree_load_address} 0x800000 ${devicetree_size} && echo Copying ramdisk... && nand read ${ramdisk_load_address} 0x820000 ${ramdisk_size} && bootm ${kernel_load_address} ${ramdisk_load_address} ${devicetree_load_address}'
-#setenv jtagboot 'echo TFTPing Linux to RAM... && tftpboot ${kernel_load_address} ${kernel_image} && tftpboot ${devicetree_load_address} ${devicetree_image} && tftpboot ${ramdisk_load_address} ${ramdisk_image} && bootm ${kernel_load_address} ${ramdisk_load_address} ${devicetree_load_address}'
-#setenv rsa_norboot 'echo Copying Image from NOR flash to RAM... && cp.b 0xE2100000 0x100000 ${boot_size} && zynqrsa 0x100000 && bootm ${kernel_load_address} ${ramdisk_load_address} ${devicetree_load_address}'
-#setenv rsa_nandboot 'echo Copying Image from NAND flash to RAM... && nand read 0x100000 0x0 ${boot_size} && zynqrsa 0x100000 && bootm ${kernel_load_address} ${ramdisk_load_address} ${devicetree_load_address}'
-#setenv rsa_qspiboot 'echo Copying Image from QSPI flash to RAM... && sf probe 0 0 0 && sf read 0x100000 0x0 ${boot_size} && zynqrsa 0x100000 && bootm ${kernel_load_address} ${ramdisk_load_address} ${devicetree_load_address}'
-#setenv rsa_sdboot 'echo Copying Image from SD to RAM... && load mmc 0 0x100000 ${boot_image} && zynqrsa 0x100000 && bootm ${kernel_load_address} ${ramdisk_load_address} ${devicetree_load_address}'
-#setenv rsa_jtagboot 'echo TFTPing Image to RAM... && tftpboot 0x100000 ${boot_image} && zynqrsa 0x100000 && bootm ${kernel_load_address} ${ramdisk_load_address} ${devicetree_load_address}'
-#setenv dfu_ram_info 'set dfu_alt_info ${kernel_image} ram 0x3000000 0x500000\\;${devicetree_image} ram 0x2A00000 0x20000\\;${ramdisk_image} ram 0x2000000 0x600000'
-#setenv dfu_ram 'run dfu_ram_info && dfu 0 ram 0'
-#setenv thor_ram 'run dfu_ram_info && thordown 0 ram 0'
-#setenv jtagboot 'echo TFTPing Linux to RAM... && tftpboot ${kernel_load_address} ${kernel_image} && tftpboot ${devicetree_load_address} ${devicetree_image} && tftpboot ${ramdisk_load_address} ${ramdisk_image} && bootm ${kernel_load_address} ${ramdisk_load_address} ${devicetree_load_address}'
-#setenv rsa_norboot 'echo Copying Image from NOR flash to RAM... && cp.b 0xE2100000 0x100000 ${boot_size} && zynqrsa 0x100000 && bootm ${kernel_load_address} ${ramdisk_load_address} ${devicetree_load_address}'
-#setenv rsa_nandboot 'echo Copying Image from NAND flash to RAM... && nand read 0x100000 0x0 ${boot_size} && zynqrsa 0x100000 && bootm ${kernel_load_address} ${ramdisk_load_address} ${devicetree_load_address}'
-#setenv rsa_qspiboot 'echo Copying Image from QSPI flash to RAM... && sf probe 0 0 0 && sf read 0x100000 0x0 ${boot_size} && zynqrsa 0x100000 && bootm ${kernel_load_address} ${ramdisk_load_address} ${devicetree_load_address}'
-#setenv rsa_sdboot 'echo Copying Image from SD to RAM... && load mmc 0 0x100000 ${boot_image} && zynqrsa 0x100000 && bootm ${kernel_load_address} ${ramdisk_load_address} ${devicetree_load_address}'
-#setenv rsa_jtagboot 'echo TFTPing Image to RAM... && tftpboot 0x100000 ${boot_image} && zynqrsa 0x100000 && bootm ${kernel_load_address} ${ramdisk_load_address} ${devicetree_load_address}'
-#setenv dfu_ram_info 'set dfu_alt_info ${kernel_image} ram 0x3000000 0x500000\\;${devicetree_image} ram 0x2A00000 0x20000\\;${ramdisk_image} ram 0x2000000 0x600000'
-#setenv dfu_ram 'run dfu_ram_info && dfu 0 ram 0'
-#setenv thor_ram 'run dfu_ram_info && thordown 0 ram 0'
-#setenv dfu_mmc_info 'set dfu_alt_info ${kernel_image} fat 0 1\\;${devicetree_image} fat 0 1\\;${ramdisk_image} fat 0 1'
-#setenv dfu_mmc 'run dfu_mmc_info && dfu 0 mmc 0'
-#setenv thor_mmc 'run dfu_mmc_info && thordown 0 mmc 0'
-setenv mmcboot 'ext4load mmc 0:2 ${kernel_load_address} /boot/zImage
-ext4load mmc 0:2 ${devicetree_load_address} /boot/zynq-ebaz4205.dtb
-setenv bootargs "root=/dev/mmcblk0p2 rootwait"
-bootz ${kernel_load_address} - ${devicetree_load_address}'
 
-button s2 && run nandboot
-run mmcboot
-run nandboot
+ext4load mmc 0:2 ${kernel_load_address} /boot/zImage
+ext4load mmc 0:2 ${devicetree_load_address} /boot/zynq-ebaz4205.dtb
+setenv bootargs "root=/dev/mmcblk0p2 rootwait ${kernel_extra}"
+bootz ${kernel_load_address} - ${devicetree_load_address}

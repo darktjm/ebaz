@@ -13,7 +13,18 @@ fi
 #if [ -e ${BINARIES_DIR}/boot.scr ]; then
 #	cp -fv ${BINARIES_DIR}/boot.scr ${TARGET_DIR}/boot/boot.scr
 #fi
-(cd ${BOARD_DIR}; bootgen -arch zynq -image boot.bif -w on -o ${BINARIES_DIR}/boot.bin) || exit 1
+printenv >/tmp/env
+echo "Generate boot.bin for flashing or SD card"
+# Note: uses fsbl binary etracted from flash; using embeddedsw to build one
+# has not produced a working one yet.
+# 1700 and 6004 came from the bootgen header
+#   dd if=/dev/mtdblock0 of=fsbl.bin bs=1 skip=$((0x1700)) count=$((0x6004*4))
+# Note: uses pre-generated bitstream, as ensuring that you can actually
+# built it is too much trouble for me right now.
+# Stupid bootgen only sets fsbl length if it reads from elf
+arm-linux-objcopy -I binary -Oelf32-littlearm ${BOARD_DIR}/fsbl.bin ${BINARIES_DIR}/fsbl.o || exit 1
+arm-linux-ld -o ${BINARIES_DIR}/fsbl.elf ${BINARIES_DIR}/fsbl.o || exit 1
+(cd ${BINARIES_DIR}; bootgen -arch zynq -image ../../${BOARD_DIR}/boot.bif -w on -o boot.bin) || exit 1
 
 # Add a console on tty1
 #if [ -e ${TARGET_DIR}/etc/inittab ]; then
