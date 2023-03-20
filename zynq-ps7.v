@@ -30,7 +30,7 @@
 
 // `` and default values are technically SystemVerilog, but yosys' default
 // Verilog supports them.  Vivado seems to complain about it, though.
-// On the other hand, it's not really possible/supportd to use `` to
+// On the other hand, it's not really possible/supported to use `` to
 // create preprocessor symbols, and yosys doesn't support `define within
 // macros (since newlines are suppressed).  So this is harder than it
 // should be.  I wish this were just cpp.
@@ -201,21 +201,21 @@
   input wire PJTAGTCK, PJTAGTDI, PJTAGTMS``sep \
   /* not sure what TDTN is for (input and output should be separate) */ \
   output wire PJTAGTDO, PJTAGTDTN
-`define PS7_PJTAG_PORTS() `PS7_PJTAG_WIRES(output, input, `_COMMA_)
+`define PS7_PJTAG_PORTS(dummy=) `PS7_PJTAG_WIRES(output, input, `_COMMA_)
 `define PS7_PJTAG_PASS(EMIO=) \
   `_PS7_EMIO_(PJTAGTCK, EMIO), `_PS7_EMIO_(PJTAGTDI, EMIO), `_PS7_EMIO_(PJTAGTMS, EMIO), \
   /* not sure what TDTN is for (input and output should be separate) */ \
   `_PS7_EMIO_(PJTAGTDO, EMIO), `_PS7_EMIO_(PJTAGTDTN, EMIO)
-`define PS7_PJTAG() `PS7_PJTAG_PASS(EMIO)
+`define PS7_PJTAG(dummy=) `PS7_PJTAG_PASS(EMIO)
 
 `define PS7_TRACE_WIRES(input =, output =, sep =`_SEMI_) \
   input wire TRACECLK``sep \
   output wire TRACECTL``sep \
   output wire [31:0] TRACEDATA
-`define PS7_TRACE_PORTS() `PS7_TRACE_WIRES(output, input, `_COMMA_)
+`define PS7_TRACE_PORTS(dummy=) `PS7_TRACE_WIRES(output, input, `_COMMA_)
 `define PS7_TRACE_PASS(EMIO=) \
   `_PS7_EMIO_(TRACECLK, EMIO), `_PS7_EMIO_(TRACECTL, EMIO), `_PS7_EMIO_(TRACEDATA, EMIO)
-`define PS7_TRACE() `PS7_TRACE_PASS(EMIO)
+`define PS7_TRACE(dummy=) `PS7_TRACE_PASS(EMIO)
 
 // Not worth it for USB, since most signals aren't available
 // output EMIOUSB``n``VBUSPWRSELECT;
@@ -227,10 +227,10 @@
 `define PS7_GPIO_WIRES(input =, output =, sep =`_SEMI_) \
   input wire [63:0] GPIOI``sep \
   output wire [63:0] GPIOO, GPIOTN
-`define PS7_GPIO_PORTS() `PS7_GPIO_WIRES(output, input, `_COMMA_)
+`define PS7_GPIO_PORTS(dummy=) `PS7_GPIO_WIRES(output, input, `_COMMA_)
 `define PS7_GPIO_PASS(EMIO=) \
   `_PS7_EMIO_(GPIOI, EMIO), `_PS7_EMIO_(GPIOO, EMIO), `_PS7_EMIO_(GPIOTN, EMIO)
-`define PS7_GPIO() `PS7_GPIO_PASS(EMIO)
+`define PS7_GPIO(dummy=) `PS7_GPIO_PASS(EMIO)
 
 // input EMIOSRAMINTIN;  alert PL that static memory has intr?? (input?)
 
@@ -246,10 +246,10 @@
 `define PS7_WDT_WIRES(input =, output =, sep =`_SEMI_) \
   input wire WDTCLKI``sep \
   output wire WDTRSTO
-`define PS7_WDT_PORTS() `PS7_WDT_WIRES(output, input, `_COMMA_)
+`define PS7_WDT_PORTS(dummy=) `PS7_WDT_WIRES(output, input, `_COMMA_)
 `define PS7_WDT_PASS(EMIO=) \
   `_PS7_EMIO_(WDTCLKI, EMIO), `_PS7_EMIO_(WDTRSTO, EMIO)
-`define PS7_WDT() `PS7_WDT_PASS(EMIO)
+`define PS7_WDT(dummy=) `PS7_WDT_PASS(EMIO)
 
 // end of EMIO
 `define _PS7_RAW_(x) .x(x)
@@ -323,7 +323,7 @@
 `define PS7_SAXIACP_WIRES(input=, output=, sep=`_SEMI_) \
   `_AXI_COMMON_WIRES(S, ACP, input, output, output, 64, 3, sep)``sep \
   input wire [4:0] SAXIACPARUSER, SAXIACPAWUSER
-`define PS7_SAXIACP_PORTS() `PS7_SAXIACP_WIRES(output, input, `_COMMA_)
+`define PS7_SAXIACP_PORTS(dummy=) `PS7_SAXIACP_WIRES(output, input, `_COMMA_)
 
 // n == 0..3
 `define PS7_SAXIHP_WIRES(n, input=, output=, sep=`_SEMI_) \
@@ -359,7 +359,7 @@
   `_PS7_RAW_(/**/``ms``AXI``n``BID), `_PS7_RAW_(/**/``ms``AXI``n``RID)
 `define PS7_MAXIGP(n) `_AXI_COMMON(M, GP``n)
 `define PS7_SAXIGP(n) `_AXI_COMMON(S, GP``n)
-`define PS7_SAXIACP() \
+`define PS7_SAXIACP(dummy=) \
   `_AXI_COMMON(S, ACP), \
   `_PS7_RAW_(SAXIACPARUSER), `_PS7_RAW_(SAXIACPAWUSER)
 `define PS7_SAXIHP(n) \
@@ -371,7 +371,7 @@
 // input [3:0] DDRARB; indicates to AXIHP port of urgent DDR need
 `define PS7_MAXIGP_PASS(n) `PS7_MAXIGP(n)
 `define PS7_SAXIGP_PASS(n) `PS7_SAXIGP(n)
-`define PS7_SAXIACP_PASS() `PS7_SAXIACP()
+`define PS7_SAXIACP_PASS(dummy=) `PS7_SAXIACP()
 `define PS7_SAXIHP_PASS(n) `PS7_SAXIHP(n)
 
 // No point for a macro for the clocks.  Just use individually

@@ -13,10 +13,11 @@ or get going on another, unrelated project, I might delete this
 repository in favor of integrating the results with those.
 
 I also own and use an expansion board which I cannot identify.  It has
-3 images of a cartoon girl (two large and one small) on the rear, if
-that helps.  I got it from the JSSHENGZHI store on AliExpress.  See
-`hdmi-lcd-board-schem.jpg` for a schematic (a merge of the two images
-provided on the AliExpress product page,
+3 images of a cartoon girl (two large and one small) on the bottom, if
+that helps.  None of the text, translated Chinese or English, indiates
+the board designer or manufacturer.  I got it from the JSSHENGZHI
+store on AliExpress.  See `hdmi-lcd-board-schem.jpg` for a schematic
+(a merge of the two images provided on the AliExpress product page,
 <https://www.aliexpress.us/item/3256804274079996.html>; I will make no
 attempt to ensure this link stays alive).  The board provides a USB
 serial port (and power derived from it), an optional 256x256 LCD
@@ -135,7 +136,7 @@ probably.  In fact, I will probably convert this into a library
 routine that can be called fromm a processor-side utility to send the
 paraemeters to the FPGA side.
 
-Some example usages:
+Some example uses:
 
 >       xc7-pll FCLKIN1=125 FCLKOUT0=25 CLKIN1name=fclk CLKOUT0name=clk25 >pll.v
 >       xc7-pll -m modname=vidpll FCLKIN1=125 FCLKOUT1=371.25 FCLKOUT0=74.25 \

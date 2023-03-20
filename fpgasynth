@@ -657,9 +657,10 @@ for a in "${arch[@]}"; do
 	      --std=08) v2k=-vhdl2008 ;;
 	    esac
 	  done
+	  test -n "$sysv" && ysysv=-sv
           cat >build.tcl <<EOF
             create_project -in_memory -part $rd
-	    ${vf[*]/*/read_verilog {&\}
+	    ${vf[*]/*/read_verilog ${ysysv} {&\}
             }
             ${vhdf[*]/*/read_vhdl $v2k $vl {&\}
             }
@@ -687,10 +688,15 @@ for a in "${arch[@]}"; do
             # free(): invalid pointer
             # Abnormal program termination (6)
 	    # Probably trying 'net access, failing, and executing untested code
-            report_timing_summary -file route_timing_summary.rpt
+            report_timing_summary -datasheet -file route_timing_summary.rpt
+	    # This is a much more useful timing report to me:
+	    report_design_analysis -complexity -logic_level_distribution -qor_summary -timing -setup -hold -show_all -congestion  -file design_analysis.rpt
             report_timing -sort_by group -max_paths 100 -path_type summary -file route_timing.rpt
             report_clock_utilization -file clock_util.rpt
-            report_utilization -file route_util.rpt
+	    report_control_sets -force -file control_sets.rpt
+	    report_qor_suggestions -file qor_suggestions.rpt
+	    report_ssn -file ssn.rpt
+            report_utilization -force -file route_util.rpt
             report_power -file route_power.rpt
             report_drc -file route_drc.rpt
             write_checkpoint -force route

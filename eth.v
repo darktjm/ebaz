@@ -23,7 +23,7 @@ module top(
 
   PS7 arm (
       .FCLKCLK(fclk),
-      `PS7_GPIO,
+      `PS7_GPIO(),
       `EBAZ_ETH_PS7
   );
 endmodule
